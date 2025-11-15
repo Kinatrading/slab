@@ -82,6 +82,9 @@ class MarketCache:
 
 class MarketClient:
     LISTING_URL = "https://steamcommunity.com/market/listings/730/{name}?l=english"
+    LISTING_RENDER_URL = (
+        "https://steamcommunity.com/market/listings/730/{name}/render?start=0&count=1&country=UA&language=english&currency=18"
+    )
     HISTOGRAM_URL = (
         "https://steamcommunity.com/market/itemordershistogram?country=UA&language=english&currency=18&item_nameid={item_nameid}"
     )
@@ -152,18 +155,39 @@ class MarketClient:
             print(f"[DEBUG] item_nameid для '{market_name}' з кешу: {cached}")
             return cached
         encoded = quote(market_name, safe="")
-        url = self.LISTING_URL.format(name=encoded)
+        try:
+            item_nameid = self._fetch_item_nameid_from_render(encoded, market_name)
+        except RuntimeError as exc:
+            print(f"[DEBUG] Render JSON без item_nameid для '{market_name}': {exc}")
+            item_nameid = self._fetch_item_nameid_from_html(encoded, market_name)
+        self._cache.set_item_nameid(market_name, item_nameid)
+        print(f"[DEBUG] item_nameid знайдено для '{market_name}': {item_nameid}")
+        return item_nameid
+
+    def _fetch_item_nameid_from_render(self, encoded_name: str, market_name: str) -> str:
+        url = self.LISTING_RENDER_URL.format(name=encoded_name)
+        print(f"[DEBUG] Render URL для '{market_name}': {url}")
+        response = self._request(url)
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            print(f"[DEBUG] Render JSON не розпарсили для '{market_name}': {response.text[:500]}")
+            raise RuntimeError("Некоректний render JSON") from exc
+        item_nameid = data.get("item_nameid")
+        if not item_nameid:
+            raise RuntimeError("item_nameid відсутній у render відповіді")
+        return str(item_nameid)
+
+    def _fetch_item_nameid_from_html(self, encoded_name: str, market_name: str) -> str:
+        url = self.LISTING_URL.format(name=encoded_name)
         print(f"[DEBUG] Listing URL для '{market_name}': {url}")
         response = self._request(url)
-        match = re.search(r"Market_LoadOrderSpread\\((\\d+)\\)", response.text)
+        match = re.search(r"Market_LoadOrderSpread\(\s*(\d+)\s*\)", response.text)
         if not match:
             snippet = response.text[:1000]
             print(f"[DEBUG] HTML без item_nameid для '{market_name}': {snippet}")
             raise RuntimeError(f"Не вдалося знайти item_nameid для {market_name}")
-        item_nameid = match.group(1)
-        self._cache.set_item_nameid(market_name, item_nameid)
-        print(f"[DEBUG] item_nameid знайдено для '{market_name}': {item_nameid}")
-        return item_nameid
+        return match.group(1)
 
     def fetch_price(self, market_name: str) -> float:
         item_nameid = self.ensure_item_nameid(market_name)
