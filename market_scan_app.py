@@ -147,6 +147,7 @@ class MarketClient:
             return cached
         encoded = quote(market_name, safe="")
         url = self.LISTING_URL.format(name=encoded)
+        print(f"[DEBUG] Listing URL для '{market_name}': {url}")
         response = self._request(url)
         match = re.search(r"Market_LoadOrderSpread\\((\\d+)\\)", response.text)
         if not match:
@@ -158,6 +159,7 @@ class MarketClient:
     def fetch_price(self, market_name: str) -> float:
         item_nameid = self.ensure_item_nameid(market_name)
         url = self.HISTOGRAM_URL.format(item_nameid=item_nameid)
+        print(f"[DEBUG] Histogram URL для '{market_name}': {url}")
         response = self._request(url)
         data = response.json()
         highest = data.get("highest_buy_order")
