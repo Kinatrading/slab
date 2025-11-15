@@ -12,6 +12,13 @@ from urllib.parse import quote
 import requests
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+
+SLAB_PRICE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 1
+STICKER_PRICE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 2
+RARITY_ROLE = QtCore.Qt.ItemDataRole.UserRole + 3
+CRATES_ROLE = QtCore.Qt.ItemDataRole.UserRole + 4
+DIFFERENCE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 5
+
 BASE_DIR = Path(__file__).resolve().parent
 STICKERS_FILE = BASE_DIR / "stickers_clean.json"
 SLABS_FILE = BASE_DIR / "stickers_slab_clean.json"
