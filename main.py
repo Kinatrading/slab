@@ -31,9 +31,12 @@ from steam_client import SteamClient
 
 
 logging.basicConfig(
-    filename="app.log",
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("app.log", encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 
 
@@ -127,6 +130,7 @@ class ScanWorker(QThread):
             client = SteamClient(self.config)
             slabs = fetch_all_slabs(client)
             if not slabs:
+                logging.error("No slab data fetched from Steam search API.")
                 self.error.emit("No slab data fetched.")
                 return
 

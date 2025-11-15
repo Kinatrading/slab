@@ -75,8 +75,15 @@ class SteamClient:
                         return data
                     except json.JSONDecodeError as exc:
                         last_error = f"JSON decode error: {exc}"
+                        snippet = response.text[:500].replace("\n", " ")
                         logging.warning(
-                            "JSON parsing failed on attempt %s: %s", attempt, exc
+                            "JSON parsing failed on attempt %s for %s with %s: %s. "
+                            "Response snippet: %s",
+                            attempt,
+                            url,
+                            params,
+                            exc,
+                            snippet,
                         )
             except requests.RequestException as exc:
                 last_error = str(exc)
