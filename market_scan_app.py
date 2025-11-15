@@ -136,14 +136,20 @@ class MarketClient:
             self._last_request = time.monotonic()
 
     def _request(self, url: str) -> requests.Response:
+        print(
+            f"[DEBUG] Виконуємо GET {url} | proxy={'on' if self._proxies else 'off'} | "
+            f"delay={self._settings.delay:.2f}s"
+        )
         self._throttle()
         response = self._session.get(url, proxies=self._proxies, timeout=30)
+        print(f"[DEBUG] Відповідь {response.status_code} ({len(response.content)} байт)")
         response.raise_for_status()
         return response
 
     def ensure_item_nameid(self, market_name: str) -> str:
         cached = self._cache.get_item_nameid(market_name)
         if cached:
+            print(f"[DEBUG] item_nameid для '{market_name}' з кешу: {cached}")
             return cached
         encoded = quote(market_name, safe="")
         url = self.LISTING_URL.format(name=encoded)
@@ -151,9 +157,12 @@ class MarketClient:
         response = self._request(url)
         match = re.search(r"Market_LoadOrderSpread\\((\\d+)\\)", response.text)
         if not match:
+            snippet = response.text[:1000]
+            print(f"[DEBUG] HTML без item_nameid для '{market_name}': {snippet}")
             raise RuntimeError(f"Не вдалося знайти item_nameid для {market_name}")
         item_nameid = match.group(1)
         self._cache.set_item_nameid(market_name, item_nameid)
+        print(f"[DEBUG] item_nameid знайдено для '{market_name}': {item_nameid}")
         return item_nameid
 
     def fetch_price(self, market_name: str) -> float:
@@ -161,15 +170,21 @@ class MarketClient:
         url = self.HISTOGRAM_URL.format(item_nameid=item_nameid)
         print(f"[DEBUG] Histogram URL для '{market_name}': {url}")
         response = self._request(url)
-        data = response.json()
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            print(f"[DEBUG] Не вдалося розпарсити JSON для '{market_name}': {response.text[:500]}")
+            raise RuntimeError(f"Некоректний JSON для {market_name}") from exc
         highest = data.get("highest_buy_order")
         if not highest:
+            print(f"[DEBUG] highest_buy_order відсутній у відповіді для '{market_name}': {data}")
             return 0.0
         try:
             price = int(highest) / 100.0
         except ValueError as exc:
             raise RuntimeError(f"Неправильний формат highest_buy_order для {market_name}") from exc
         self._cache.set_price(market_name, price)
+        print(f"[DEBUG] Оновлена ціна '{market_name}': ₴{price:.2f}")
         return price
 
 
@@ -189,12 +204,22 @@ class ScanWorker(QtCore.QObject):
         for pair in self._pairs:
             if self._stop_event.is_set():
                 break
+            self.progressMessage.emit(
+                f"Сканую пару #{pair.index + 1}: {pair.slab_name} / {pair.sticker_name}"
+            )
+            print(
+                f"[DEBUG] Починаємо пару #{pair.index + 1}: slab='{pair.slab_name}', sticker='{pair.sticker_name}'"
+            )
             try:
                 sticker_price = self._client.fetch_price(pair.sticker_name)
                 slab_price = self._client.fetch_price(pair.slab_name)
             except Exception as exc:  # noqa: BLE001 - bubble up to UI
+                print(f"[DEBUG] Помилка при обробці пари #{pair.index + 1}: {exc}")
                 self.progressMessage.emit(str(exc))
                 continue
+            print(
+                f"[DEBUG] Пара #{pair.index + 1} готова: slab=₴{slab_price:.2f}, sticker=₴{sticker_price:.2f}"
+            )
             self.rowUpdated.emit(pair.index, slab_price, sticker_price)
         self.finished.emit()
 
