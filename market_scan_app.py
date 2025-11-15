@@ -593,38 +593,20 @@ class MainWindow(QtWidgets.QWidget):
         self._row_prices = {
             pair.index: {"slab": None, "sticker": None} for pair in self._pairs
         }
+        self._manual_rows: Dict[int, int] = {}
+        self._manual_row_pairs: Dict[int, int] = {}
         self.setWindowTitle("Steam Sticker Scanner")
         self.resize(1100, 700)
         self._init_ui()
         self._load_settings()
 
     def _init_ui(self) -> None:
-        self.table_model = QtGui.QStandardItemModel(len(self._pairs), 5)
+        self.table_model = QtGui.QStandardItemModel(0, 5)
         self.table_model.setHorizontalHeaderLabels(
             ["Назва слабу", "Назва стікеру", "Ціна слабу", "Ціна стікеру", "Різниця"]
         )
-        for row, pair in enumerate(self._pairs):
-            slab_item = QtGui.QStandardItem(pair.slab_name)
-            sticker_item = QtGui.QStandardItem(pair.sticker_name)
-            for item in (slab_item, sticker_item):
-                item.setEditable(False)
-            slab_item.setData(pair.rarity_name, RARITY_ROLE)
-            slab_item.setData(pair.crates, CRATES_ROLE)
-            self.table_model.setItem(row, 0, slab_item)
-            self.table_model.setItem(row, 1, sticker_item)
-            for col in range(2, 5):
-                placeholder = QtGui.QStandardItem("—")
-                placeholder.setEditable(False)
-                placeholder.setData(None, QtCore.Qt.ItemDataRole.UserRole)
-                role = (
-                    SLAB_PRICE_ROLE
-                    if col == 2
-                    else STICKER_PRICE_ROLE
-                    if col == 3
-                    else DIFFERENCE_ROLE
-                )
-                placeholder.setData(None, role)
-                self.table_model.setItem(row, col, placeholder)
+        for pair in self._pairs:
+            self.table_model.appendRow(self._build_row_items(pair))
 
         self.proxy_model = PairFilterProxy()
         self.proxy_model.setSourceModel(self.table_model)
@@ -644,6 +626,65 @@ class MainWindow(QtWidgets.QWidget):
         self.filters_panel = FiltersPanel(self._available_rarities, self._available_crates)
         self.filters_panel.filtersChanged.connect(self._apply_filters)
 
+        self.manual_model = QtGui.QStandardItemModel(0, 5)
+        self.manual_model.setHorizontalHeaderLabels(
+            ["Назва слабу", "Назва стікеру", "Ціна слабу", "Ціна стікеру", "Різниця"]
+        )
+        self.manual_table_view = QtWidgets.QTableView()
+        self.manual_table_view.setModel(self.manual_model)
+        self.manual_table_view.horizontalHeader().setStretchLastSection(True)
+        self.manual_table_view.verticalHeader().setVisible(False)
+        self.manual_table_view.setAlternatingRowColors(True)
+        self.manual_table_view.setSortingEnabled(False)
+        self.manual_table_view.setStyleSheet(
+            "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
+            "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
+        )
+
+        self.manual_search_input = QtWidgets.QLineEdit()
+        self.manual_search_input.setPlaceholderText("Введіть назву стікеру або слабу...")
+        self.manual_results_list = QtWidgets.QListWidget()
+        self.manual_results_list.setMaximumHeight(150)
+        self.manual_results_list.setStyleSheet(
+            "QListWidget { background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; }"
+            "QListWidget::item:selected { background-color: #1f6feb; color: white; }"
+        )
+        self.manual_search_input.textChanged.connect(self._update_manual_results)
+        self.manual_search_input.returnPressed.connect(self._handle_manual_enter)
+        self.manual_results_list.itemActivated.connect(self._handle_manual_result_activation)
+
+        self._search_entries = self._build_search_entries()
+
+        self.save_base_button = QtWidgets.QPushButton("Зберегти базу")
+        self.save_base_button.clicked.connect(self._save_manual_base)
+        self.import_base_button = QtWidgets.QPushButton("Імпортувати базу")
+        self.import_base_button.clicked.connect(self._import_manual_base)
+
+        manual_controls = QtWidgets.QHBoxLayout()
+        manual_controls.addWidget(self.import_base_button)
+        manual_controls.addWidget(self.save_base_button)
+        manual_controls.addStretch()
+
+        manual_tab = QtWidgets.QWidget()
+        manual_layout = QtWidgets.QVBoxLayout()
+        manual_layout.addWidget(QtWidgets.QLabel("Пошук пар"))
+        manual_layout.addWidget(self.manual_search_input)
+        manual_layout.addWidget(self.manual_results_list)
+        manual_layout.addWidget(self.manual_table_view)
+        manual_layout.addLayout(manual_controls)
+        manual_tab.setLayout(manual_layout)
+        self.manual_tab = manual_tab
+
+        all_pairs_tab = QtWidgets.QWidget()
+        all_layout = QtWidgets.QVBoxLayout()
+        all_layout.addWidget(self.table_view)
+        all_layout.addWidget(self.filters_panel)
+        all_pairs_tab.setLayout(all_layout)
+
+        self.tabs = QtWidgets.QTabWidget()
+        self.tabs.addTab(all_pairs_tab, "Усі пари")
+        self.tabs.addTab(self.manual_tab, "Обрані пари")
+
         self.settings_panel = SettingsPanel()
 
         self.status_label = QtWidgets.QLabel("Готово")
@@ -658,10 +699,9 @@ class MainWindow(QtWidgets.QWidget):
         )
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.table_view)
+        layout.addWidget(self.tabs)
 
         controls = QtWidgets.QHBoxLayout()
-        controls.addWidget(self.filters_panel)
         controls.addWidget(self.settings_panel)
 
         right_column = QtWidgets.QVBoxLayout()
@@ -674,6 +714,315 @@ class MainWindow(QtWidgets.QWidget):
         self.setLayout(layout)
         self.setStyleSheet("background-color: #05090f; color: #c9d1d9; font-size: 14px;")
         self._apply_filters()
+        self._update_manual_results("")
+
+    def _build_row_items(self, pair: ItemPair) -> List[QtGui.QStandardItem]:
+        slab_item = QtGui.QStandardItem(pair.slab_name)
+        sticker_item = QtGui.QStandardItem(pair.sticker_name)
+        for item in (slab_item, sticker_item):
+            item.setEditable(False)
+        slab_item.setData(pair.rarity_name, RARITY_ROLE)
+        slab_item.setData(pair.crates, CRATES_ROLE)
+
+        slab_price = QtGui.QStandardItem("—")
+        slab_price.setEditable(False)
+        slab_price.setData(None, QtCore.Qt.ItemDataRole.UserRole)
+        slab_price.setData(None, SLAB_PRICE_ROLE)
+
+        sticker_price = QtGui.QStandardItem("—")
+        sticker_price.setEditable(False)
+        sticker_price.setData(None, QtCore.Qt.ItemDataRole.UserRole)
+        sticker_price.setData(None, STICKER_PRICE_ROLE)
+
+        difference = QtGui.QStandardItem("—")
+        difference.setEditable(False)
+        difference.setData(None, QtCore.Qt.ItemDataRole.UserRole)
+        difference.setData(None, DIFFERENCE_ROLE)
+
+        return [slab_item, sticker_item, slab_price, sticker_price, difference]
+
+    def _build_search_entries(self) -> List[Dict[str, object]]:
+        entries: List[Dict[str, object]] = []
+        for pair in self._pairs:
+            entries.append(
+                {
+                    "label": f"{pair.slab_name} — слаб",
+                    "search": pair.slab_name.lower(),
+                    "pair_index": pair.index,
+                }
+            )
+            entries.append(
+                {
+                    "label": f"{pair.sticker_name} — стікер",
+                    "search": pair.sticker_name.lower(),
+                    "pair_index": pair.index,
+                }
+            )
+        entries.sort(key=lambda item: item["label"])
+        return entries
+
+    def _update_manual_results(self, text: str) -> None:
+        query = text.strip().lower()
+        self.manual_results_list.clear()
+        if not self._search_entries:
+            return
+        matches: List[Dict[str, object]] = []
+        if not query:
+            matches = self._search_entries[:50]
+        else:
+            for entry in self._search_entries:
+                if query in entry["search"]:
+                    matches.append(entry)
+                if len(matches) >= 50:
+                    break
+        for entry in matches:
+            item = QtWidgets.QListWidgetItem(entry["label"])
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, entry["pair_index"])
+            self.manual_results_list.addItem(item)
+
+    def _handle_manual_enter(self) -> None:
+        item = self.manual_results_list.item(0)
+        if item is not None:
+            self._handle_manual_result_activation(item)
+
+    def _handle_manual_result_activation(self, item: QtWidgets.QListWidgetItem) -> None:
+        pair_index = item.data(QtCore.Qt.ItemDataRole.UserRole)
+        if pair_index is None:
+            return
+        try:
+            pair = self._pairs[int(pair_index)]
+        except (ValueError, IndexError):
+            return
+        self._add_manual_pair(pair)
+
+    def _add_manual_pair(self, pair: ItemPair) -> None:
+        if pair.index in self._manual_rows:
+            return
+        row_items = self._build_row_items(pair)
+        self.manual_model.appendRow(row_items)
+        row = self.manual_model.rowCount() - 1
+        self._manual_rows[pair.index] = row
+        self._manual_row_pairs[row] = pair.index
+        self.manual_search_input.clear()
+        self.manual_results_list.clear()
+        self._apply_existing_prices_to_manual_row(pair.index)
+
+    def _apply_existing_prices_to_manual_row(self, pair_index: int) -> None:
+        row = self._manual_rows.get(pair_index)
+        if row is None:
+            return
+        prices = self._row_prices.get(pair_index, {})
+        updated = False
+        for is_slab, key in ((True, "slab"), (False, "sticker")):
+            value = prices.get(key)
+            if value is not None:
+                self._update_model_price_cell(
+                    self.manual_model,
+                    row,
+                    pair_index,
+                    is_slab,
+                    f"₴{value:.2f}",
+                    value,
+                )
+                updated = True
+        if updated:
+            self._update_difference_for_model(self.manual_model, row, pair_index)
+
+    def _selected_pairs_for_scan(self) -> Tuple[List[ItemPair], str]:
+        if self.tabs.currentWidget() == self.manual_tab:
+            manual_pairs = self._collect_manual_pairs()
+            return manual_pairs, "manual"
+        return self.filters_panel.filter_pairs_for_scan(self._pairs), "all"
+
+    def _collect_manual_pairs(self) -> List[ItemPair]:
+        pairs: List[ItemPair] = []
+        for row in range(self.manual_model.rowCount()):
+            pair_index = self._manual_row_pairs.get(row)
+            if pair_index is None:
+                continue
+            try:
+                pairs.append(self._pairs[pair_index])
+            except IndexError:
+                continue
+        return pairs
+
+    def _clear_manual_pairs(self) -> None:
+        self.manual_model.removeRows(0, self.manual_model.rowCount())
+        self._manual_rows.clear()
+        self._manual_row_pairs.clear()
+
+    def _save_manual_base(self) -> None:
+        selected_pairs = self._collect_manual_pairs()
+        if not selected_pairs:
+            QtWidgets.QMessageBox.warning(self, "Порожній список", "Немає пар для збереження")
+            return
+        base_name, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Назва бази",
+            "Введіть назву бази",
+            text="my_pairs",
+        )
+        if not ok:
+            return
+        safe_name = self._sanitize_base_name(base_name)
+        if not safe_name:
+            QtWidgets.QMessageBox.warning(self, "Помилка", "Некоректна назва бази")
+            return
+        default_path = BASE_DIR / f"{safe_name}.json"
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Зберегти базу",
+            str(default_path),
+            "JSON (*.json)",
+        )
+        if not file_path:
+            return
+        data = {
+            "name": base_name,
+            "pairs": [
+                {
+                    "index": pair.index,
+                    "sticker": pair.sticker_name,
+                    "slab": pair.slab_name,
+                }
+                for pair in selected_pairs
+            ],
+        }
+        try:
+            Path(file_path).write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except OSError as exc:
+            QtWidgets.QMessageBox.critical(self, "Помилка", str(exc))
+            return
+        QtWidgets.QMessageBox.information(self, "Готово", "Базу збережено")
+
+    def _import_manual_base(self) -> None:
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Імпортувати базу",
+            str(BASE_DIR),
+            "JSON (*.json)",
+        )
+        if not file_path:
+            return
+        try:
+            data = json.loads(Path(file_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            QtWidgets.QMessageBox.critical(self, "Помилка", f"Не вдалося прочитати файл: {exc}")
+            return
+        pairs_data = data.get("pairs")
+        if not isinstance(pairs_data, list):
+            QtWidgets.QMessageBox.warning(self, "Помилка", "Некоректний формат файлу")
+            return
+        self._clear_manual_pairs()
+        missing = 0
+        added = 0
+        for entry in pairs_data:
+            pair: Optional[ItemPair] = None
+            if isinstance(entry, dict):
+                idx = entry.get("index")
+                if isinstance(idx, int) and 0 <= idx < len(self._pairs):
+                    pair = self._pairs[idx]
+                else:
+                    pair = self._find_pair_by_names(
+                        entry.get("sticker"), entry.get("slab")
+                    )
+            elif isinstance(entry, int) and 0 <= entry < len(self._pairs):
+                pair = self._pairs[entry]
+            if pair is None:
+                missing += 1
+                continue
+            self._add_manual_pair(pair)
+            added += 1
+        message = f"Імпортовано {added} пар"
+        if missing:
+            message += f", пропущено {missing}"
+        QtWidgets.QMessageBox.information(self, "Результат", message)
+
+    @staticmethod
+    def _sanitize_base_name(name: str) -> str:
+        cleaned = re.sub(r"[^\w\- ]+", "", name, flags=re.UNICODE).strip()
+        return cleaned.replace(" ", "_")
+
+    def _find_pair_by_names(
+        self, sticker_name: Optional[str], slab_name: Optional[str]
+    ) -> Optional[ItemPair]:
+        if not sticker_name or not slab_name:
+            return None
+        for pair in self._pairs:
+            if pair.sticker_name == sticker_name and pair.slab_name == slab_name:
+                return pair
+        return None
+
+    def _apply_price_to_models(
+        self,
+        pair_index: int,
+        is_slab: bool,
+        text: str,
+        value: Optional[float],
+    ) -> None:
+        self._update_model_price_cell(
+            self.table_model,
+            pair_index,
+            pair_index,
+            is_slab,
+            text,
+            value,
+        )
+        manual_row = self._manual_rows.get(pair_index)
+        if manual_row is not None:
+            self._update_model_price_cell(
+                self.manual_model,
+                manual_row,
+                pair_index,
+                is_slab,
+                text,
+                value,
+            )
+
+    def _update_model_price_cell(
+        self,
+        model: QtGui.QStandardItemModel,
+        row: int,
+        pair_index: int,
+        is_slab: bool,
+        text: str,
+        value: Optional[float],
+    ) -> None:
+        column = 2 if is_slab else 3
+        role = SLAB_PRICE_ROLE if is_slab else STICKER_PRICE_ROLE
+        item = model.item(row, column)
+        if item is None:
+            item = QtGui.QStandardItem("—")
+            item.setEditable(False)
+            model.setItem(row, column, item)
+        item.setText(text)
+        item.setData(value, QtCore.Qt.ItemDataRole.UserRole)
+        item.setData(value, role)
+        item.setEditable(False)
+        self._update_difference_for_model(model, row, pair_index)
+
+    def _update_difference_for_model(
+        self, model: QtGui.QStandardItemModel, row: int, pair_index: int
+    ) -> None:
+        item = model.item(row, 4)
+        if item is None:
+            item = QtGui.QStandardItem("—")
+            model.setItem(row, 4, item)
+        prices = self._row_prices.setdefault(pair_index, {})
+        slab_price = prices.get("slab")
+        sticker_price = prices.get("sticker")
+        if slab_price is not None and sticker_price is not None:
+            diff = slab_price - sticker_price
+            item.setText(f"₴{diff:.2f}")
+            item.setData(diff, QtCore.Qt.ItemDataRole.UserRole)
+            item.setData(diff, DIFFERENCE_ROLE)
+        else:
+            item.setText("Очікуємо дані")
+            item.setData(None, QtCore.Qt.ItemDataRole.UserRole)
+            item.setData(None, DIFFERENCE_ROLE)
+        item.setEditable(False)
 
     def _load_settings(self) -> None:
         if SETTINGS_FILE.exists():
@@ -705,9 +1054,12 @@ class MainWindow(QtWidgets.QWidget):
             self._stop_worker()
             return
         self._save_settings()
-        scan_pairs = self.filters_panel.filter_pairs_for_scan(self._pairs)
+        scan_pairs, mode = self._selected_pairs_for_scan()
         if not scan_pairs:
-            self.status_label.setText("Немає предметів, що відповідають фільтрам")
+            if mode == "manual":
+                self.status_label.setText("Додайте пари у вкладці 'Обрані пари'")
+            else:
+                self.status_label.setText("Немає предметів, що відповідають фільтрам")
             self.scan_button.setChecked(False)
             return
         runtime_settings = self.settings_panel.to_runtime_settings()
@@ -739,55 +1091,17 @@ class MainWindow(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot(int, bool, float)
     def _handle_price_update(self, index: int, is_slab: bool, price: float) -> None:
-        column = 2 if is_slab else 3
-        role = SLAB_PRICE_ROLE if is_slab else STICKER_PRICE_ROLE
-        item = self.table_model.item(index, column)
-        if item is None:
-            item = QtGui.QStandardItem()
-            self.table_model.setItem(index, column, item)
-        item.setText(f"₴{price:.2f}")
-        item.setData(price, QtCore.Qt.ItemDataRole.UserRole)
-        item.setData(price, role)
-        item.setEditable(False)
         key = "slab" if is_slab else "sticker"
         self._row_prices.setdefault(index, {})[key] = price
-        self._update_difference_cell(index)
+        self._apply_price_to_models(index, is_slab, f"₴{price:.2f}", price)
         self.proxy_model.invalidateFilter()
 
     @QtCore.pyqtSlot(int, bool, str)
     def _handle_price_failure(self, index: int, is_slab: bool, message: str) -> None:
-        column = 2 if is_slab else 3
-        role = SLAB_PRICE_ROLE if is_slab else STICKER_PRICE_ROLE
-        item = self.table_model.item(index, column)
-        if item is None:
-            item = QtGui.QStandardItem()
-            self.table_model.setItem(index, column, item)
-        item.setText(message)
-        item.setData(None, QtCore.Qt.ItemDataRole.UserRole)
-        item.setData(None, role)
-        item.setEditable(False)
         key = "slab" if is_slab else "sticker"
         self._row_prices.setdefault(index, {})[key] = None
-        self._update_difference_cell(index)
+        self._apply_price_to_models(index, is_slab, message, None)
         self.proxy_model.invalidateFilter()
-
-    def _update_difference_cell(self, index: int) -> None:
-        item = self.table_model.item(index, 4)
-        if item is None:
-            item = QtGui.QStandardItem("—")
-            self.table_model.setItem(index, 4, item)
-        slab_price = self._row_prices.setdefault(index, {}).get("slab")
-        sticker_price = self._row_prices.setdefault(index, {}).get("sticker")
-        if slab_price is not None and sticker_price is not None:
-            diff = slab_price - sticker_price
-            item.setText(f"₴{diff:.2f}")
-            item.setData(diff, QtCore.Qt.ItemDataRole.UserRole)
-            item.setData(diff, DIFFERENCE_ROLE)
-        else:
-            item.setText("Очікуємо дані")
-            item.setData(None, QtCore.Qt.ItemDataRole.UserRole)
-            item.setData(None, DIFFERENCE_ROLE)
-        item.setEditable(False)
 
     @QtCore.pyqtSlot(str)
     def _update_status(self, message: str) -> None:
