@@ -26,6 +26,174 @@ CACHE_FILE = BASE_DIR / "market_cache.json"
 SETTINGS_FILE = BASE_DIR / "settings.json"
 
 
+class Translator:
+    DEFAULT_LANGUAGE = "uk"
+
+    _TRANSLATIONS: Dict[str, Dict[str, str]] = {
+        "uk": {
+            "filters_title": "Фільтри",
+            "filters_priced_only": "Показати лише з наявними цінами",
+            "filters_all_rarities": "Усі рідкості",
+            "filters_all_crates": "Усі крейти",
+            "filters_min_price": "Мін ціна",
+            "filters_max_price": "Макс ціна",
+            "filters_unknown": "Невідомо",
+            "filters_selected": "Обрано: {count}",
+            "settings_title": "Налаштування",
+            "settings_proxy": "Проксі",
+            "settings_cookies": "Кукіс",
+            "settings_delay": "Затримка",
+            "settings_language": "Мова",
+            "settings_proxy_placeholder": "Один проксі на рядок у форматі Host:Port[:User:Pass]",
+            "settings_cookies_placeholder": "sessionid=...; steamLoginSecure=...",
+            "language_uk": "Українська",
+            "language_en": "English",
+            "table_slab": "Назва слабу",
+            "table_sticker": "Назва стікеру",
+            "table_slab_price": "Ціна слабу",
+            "table_sticker_price": "Ціна стікеру",
+            "table_difference": "Різниця",
+            "manual_placeholder": "Введіть назву стікеру або слабу...",
+            "manual_save": "Зберегти базу",
+            "manual_import": "Імпортувати базу",
+            "manual_search": "Пошук пар",
+            "tab_all_pairs": "Усі пари",
+            "tab_selected_pairs": "Обрані пари",
+            "status_ready": "Готово",
+            "status_scanning": "Сканування...",
+            "status_stopped": "Зупинено",
+            "status_add_pairs": "Додайте пари у вкладці 'Обрані пари'",
+            "status_no_results": "Немає предметів, що відповідають фільтрам",
+            "scan_start": "Старт сканування",
+            "scan_stop": "Зупинити сканування",
+            "scan_pair": "Сканую пару #{index}: {slab} / {sticker}",
+            "manual_label_slab": "— слаб",
+            "manual_label_sticker": "— стікер",
+            "message_empty_list": "Порожній список",
+            "message_no_pairs_to_save": "Немає пар для збереження",
+            "message_base_name": "Назва бази",
+            "message_enter_base_name": "Введіть назву бази",
+            "message_error": "Помилка",
+            "message_invalid_base_name": "Некоректна назва бази",
+            "message_save_base": "Зберегти базу",
+            "message_done": "Готово",
+            "message_base_saved": "Базу збережено",
+            "message_import_base": "Імпортувати базу",
+            "message_file_read_error": "Не вдалося прочитати файл: {exc}",
+            "message_invalid_file": "Некоректний формат файлу",
+            "message_result": "Результат",
+            "message_import_result": "Імпортовано {added} пар",
+            "message_import_skipped": ", пропущено {missing}",
+            "waiting_data": "Очікуємо дані",
+            "no_pairs_available": "Немає доступних пар предметів",
+            "status_rate_limit": "429 для {url}. Поточний проксі: {proxy_state}",
+            "status_all_proxies_wait": "Усі проксі дали 429. Пауза 10 хвилин",
+            "status_no_proxy_wait": "429 без проксі. Пауза 10 хвилин",
+            "status_proxy_off": "без проксі",
+            "render_json_invalid": "Некоректний render JSON",
+            "render_missing_item": "item_nameid відсутній у render відповіді",
+            "missing_item_nameid": "Не вдалося знайти item_nameid для {name}",
+            "invalid_json": "Некоректний JSON для {name}",
+            "invalid_highest": "Неправильний формат highest_buy_order для {name}",
+        },
+        "en": {
+            "filters_title": "Filters",
+            "filters_priced_only": "Show only items with prices",
+            "filters_all_rarities": "All rarities",
+            "filters_all_crates": "All crates",
+            "filters_min_price": "Min price",
+            "filters_max_price": "Max price",
+            "filters_unknown": "Unknown",
+            "filters_selected": "Selected: {count}",
+            "settings_title": "Settings",
+            "settings_proxy": "Proxies",
+            "settings_cookies": "Cookies",
+            "settings_delay": "Delay",
+            "settings_language": "Language",
+            "settings_proxy_placeholder": "One proxy per line, Host:Port[:User:Pass]",
+            "settings_cookies_placeholder": "sessionid=...; steamLoginSecure=...",
+            "language_uk": "Ukrainian",
+            "language_en": "English",
+            "table_slab": "Slab name",
+            "table_sticker": "Sticker name",
+            "table_slab_price": "Slab price",
+            "table_sticker_price": "Sticker price",
+            "table_difference": "Difference",
+            "manual_placeholder": "Enter sticker or slab name...",
+            "manual_save": "Save base",
+            "manual_import": "Import base",
+            "manual_search": "Pair search",
+            "tab_all_pairs": "All pairs",
+            "tab_selected_pairs": "Selected pairs",
+            "status_ready": "Ready",
+            "status_scanning": "Scanning...",
+            "status_stopped": "Stopped",
+            "status_add_pairs": "Add pairs on the 'Selected pairs' tab",
+            "status_no_results": "No items match the filters",
+            "scan_start": "Start scan",
+            "scan_stop": "Stop scan",
+            "scan_pair": "Scanning pair #{index}: {slab} / {sticker}",
+            "manual_label_slab": "— slab",
+            "manual_label_sticker": "— sticker",
+            "message_empty_list": "Empty list",
+            "message_no_pairs_to_save": "No pairs to save",
+            "message_base_name": "Base name",
+            "message_enter_base_name": "Enter base name",
+            "message_error": "Error",
+            "message_invalid_base_name": "Invalid base name",
+            "message_save_base": "Save base",
+            "message_done": "Done",
+            "message_base_saved": "Base saved",
+            "message_import_base": "Import base",
+            "message_file_read_error": "Failed to read file: {exc}",
+            "message_invalid_file": "Invalid file format",
+            "message_result": "Result",
+            "message_import_result": "Imported {added} pairs",
+            "message_import_skipped": ", skipped {missing}",
+            "waiting_data": "Waiting for data",
+            "no_pairs_available": "No item pairs available",
+            "status_rate_limit": "429 for {url}. Current proxy: {proxy_state}",
+            "status_all_proxies_wait": "All proxies returned 429. Pausing for 10 minutes",
+            "status_no_proxy_wait": "429 without proxies. Pausing for 10 minutes",
+            "status_proxy_off": "no proxy",
+            "render_json_invalid": "Invalid render JSON",
+            "render_missing_item": "item_nameid missing in render response",
+            "missing_item_nameid": "Could not find item_nameid for {name}",
+            "invalid_json": "Invalid JSON for {name}",
+            "invalid_highest": "Invalid highest_buy_order format for {name}",
+        },
+    }
+
+    def __init__(self, language: Optional[str] = None) -> None:
+        self.language = language or self.DEFAULT_LANGUAGE
+        if self.language not in self._TRANSLATIONS:
+            self.language = self.DEFAULT_LANGUAGE
+
+    def set_language(self, language: str) -> None:
+        self.language = language if language in self._TRANSLATIONS else self.DEFAULT_LANGUAGE
+
+    def t(self, key: str, **kwargs: object) -> str:
+        template = self._TRANSLATIONS.get(self.language, {}).get(key)
+        if template is None:
+            template = self._TRANSLATIONS[self.DEFAULT_LANGUAGE].get(key, key)
+        return template.format(**kwargs)
+
+    def languages(self) -> List[str]:
+        return list(self._TRANSLATIONS.keys())
+
+    def language_label(self, code: str) -> str:
+        return self._TRANSLATIONS.get(self.language, {}).get(f"language_{code}", code)
+
+
+def load_settings_file() -> Dict[str, object]:
+    if SETTINGS_FILE.exists():
+        try:
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
 class ItemPair(NamedTuple):
     index: int
     sticker_name: str
@@ -98,9 +266,10 @@ class MarketClient:
         "https://steamcommunity.com/market/itemordershistogram?country=UA&language=english&currency=18&item_nameid={item_nameid}"
     )
 
-    def __init__(self, cache: MarketCache, settings: RuntimeSettings) -> None:
+    def __init__(self, cache: MarketCache, settings: RuntimeSettings, translator: Translator) -> None:
         self._cache = cache
         self._settings = settings
+        self._translator = translator
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -170,22 +339,24 @@ class MarketClient:
 
     def _handle_rate_limit(self, url: str) -> None:
         proxy_state = (
-            f"{self._proxy_index + 1}/{len(self._proxy_pool)}" if self._proxy_pool else "без проксі"
+            f"{self._proxy_index + 1}/{len(self._proxy_pool)}"
+            if self._proxy_pool
+            else self._translator.t("status_proxy_off")
         )
-        message = f"429 для {url}. Поточний проксі: {proxy_state}"
+        message = self._translator.t("status_rate_limit", url=url, proxy_state=proxy_state)
         print(f"[DEBUG] {message}")
         self._emit_status(message)
         if self._proxy_pool:
             self._proxy_rotation_hits += 1
             self._advance_proxy()
             if self._proxy_rotation_hits >= len(self._proxy_pool):
-                wait_message = "Усі проксі дали 429. Пауза 10 хвилин"
+                wait_message = self._translator.t("status_all_proxies_wait")
                 print(f"[DEBUG] {wait_message}")
                 self._emit_status(wait_message)
                 time.sleep(600)
                 self._proxy_rotation_hits = 0
         else:
-            wait_message = "429 без проксі. Пауза 10 хвилин"
+            wait_message = self._translator.t("status_no_proxy_wait")
             print(f"[DEBUG] {wait_message}")
             self._emit_status(wait_message)
             time.sleep(600)
@@ -232,10 +403,10 @@ class MarketClient:
             data = response.json()
         except json.JSONDecodeError as exc:
             print(f"[DEBUG] Render JSON не розпарсили для '{market_name}': {response.text[:500]}")
-            raise RuntimeError("Некоректний render JSON") from exc
+            raise RuntimeError(self._translator.t("render_json_invalid")) from exc
         item_nameid = data.get("item_nameid")
         if not item_nameid:
-            raise RuntimeError("item_nameid відсутній у render відповіді")
+            raise RuntimeError(self._translator.t("render_missing_item"))
         return str(item_nameid)
 
     def _fetch_item_nameid_from_html(self, encoded_name: str, market_name: str) -> str:
@@ -246,7 +417,7 @@ class MarketClient:
         if not match:
             snippet = response.text[:1000]
             print(f"[DEBUG] HTML без item_nameid для '{market_name}': {snippet}")
-            raise RuntimeError(f"Не вдалося знайти item_nameid для {market_name}")
+            raise RuntimeError(self._translator.t("missing_item_nameid", name=market_name))
         return match.group(1)
 
     def fetch_price(self, market_name: str) -> float:
@@ -258,7 +429,7 @@ class MarketClient:
             data = response.json()
         except json.JSONDecodeError as exc:
             print(f"[DEBUG] Не вдалося розпарсити JSON для '{market_name}': {response.text[:500]}")
-            raise RuntimeError(f"Некоректний JSON для {market_name}") from exc
+            raise RuntimeError(self._translator.t("invalid_json", name=market_name)) from exc
         highest = data.get("highest_buy_order")
         if not highest:
             print(f"[DEBUG] highest_buy_order відсутній у відповіді для '{market_name}': {data}")
@@ -266,7 +437,7 @@ class MarketClient:
         try:
             price = int(highest) / 100.0
         except ValueError as exc:
-            raise RuntimeError(f"Неправильний формат highest_buy_order для {market_name}") from exc
+            raise RuntimeError(self._translator.t("invalid_highest", name=market_name)) from exc
         self._cache.set_price(market_name, price)
         print(f"[DEBUG] Оновлена ціна '{market_name}': ₴{price:.2f}")
         return price
@@ -278,10 +449,11 @@ class ScanWorker(QtCore.QObject):
     progressMessage = QtCore.pyqtSignal(str)
     finished = QtCore.pyqtSignal()
 
-    def __init__(self, pairs: List[ItemPair], client: MarketClient) -> None:
+    def __init__(self, pairs: List[ItemPair], client: MarketClient, translator: Translator) -> None:
         super().__init__()
         self._pairs = pairs
         self._client = client
+        self._translator = translator
         self._stop_event = threading.Event()
         self._client.set_status_callback(self.progressMessage.emit)
 
@@ -291,7 +463,9 @@ class ScanWorker(QtCore.QObject):
             if self._stop_event.is_set():
                 break
             self.progressMessage.emit(
-                f"Сканую пару #{pair.index + 1}: {pair.slab_name} / {pair.sticker_name}"
+                self._translator.t(
+                    "scan_pair", index=pair.index + 1, slab=pair.slab_name, sticker=pair.sticker_name
+                )
             )
             print(
                 f"[DEBUG] Починаємо пару #{pair.index + 1}: slab='{pair.slab_name}', sticker='{pair.sticker_name}'"
@@ -407,9 +581,12 @@ class PairFilterProxy(NumericSortProxy):
 class FiltersPanel(QtWidgets.QGroupBox):
     filtersChanged = QtCore.pyqtSignal()
 
-    def __init__(self, rarities: List[str], crates: List[str]) -> None:
-        super().__init__("Фільтри")
-        self.priced_only = QtWidgets.QCheckBox("Показати лише з наявними цінами")
+    def __init__(self, rarities: List[str], crates: List[str], translator: Translator) -> None:
+        self._translator = translator
+        self._available_rarities = rarities
+        self._available_crates = crates
+        super().__init__(self._translator.t("filters_title"))
+        self.priced_only = QtWidgets.QCheckBox(self._translator.t("filters_priced_only"))
         self.priced_only.toggled.connect(self.filtersChanged.emit)
 
         self.min_price_input = QtWidgets.QDoubleSpinBox()
@@ -425,19 +602,21 @@ class FiltersPanel(QtWidgets.QGroupBox):
         self.max_price_input.valueChanged.connect(self._handle_max_price_change)
 
         self.rarity_button, self._rarity_actions = self._build_menu_button(
-            "Усі рідкості", rarities or ["Невідомо"], self._handle_rarity_menu
+            self._translator.t("filters_all_rarities"),
+            rarities or [self._translator.t("filters_unknown")],
+            self._handle_rarity_menu,
         )
         self.crates_button, self._crate_actions = self._build_menu_button(
-            "Усі крейти", crates, self._handle_crate_menu
+            self._translator.t("filters_all_crates"), crates, self._handle_crate_menu
         )
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.priced_only)
 
         price_row = QtWidgets.QHBoxLayout()
-        price_row.addWidget(QtWidgets.QLabel("Мін ціна"))
+        price_row.addWidget(QtWidgets.QLabel(self._translator.t("filters_min_price")))
         price_row.addWidget(self.min_price_input)
-        price_row.addWidget(QtWidgets.QLabel("Макс ціна"))
+        price_row.addWidget(QtWidgets.QLabel(self._translator.t("filters_max_price")))
         price_row.addWidget(self.max_price_input)
         layout.addLayout(price_row)
 
@@ -455,8 +634,9 @@ class FiltersPanel(QtWidgets.QGroupBox):
         menu = QtWidgets.QMenu(self)
         actions: List[QtGui.QAction] = []
         for option in options:
-            text = option or "Невідомо"
+            text = option or self._translator.t("filters_unknown")
             action = QtGui.QAction(text, self)
+            action.setData(option)
             action.setCheckable(True)
             action.toggled.connect(handler)
             action.toggled.connect(self.filtersChanged.emit)
@@ -481,10 +661,14 @@ class FiltersPanel(QtWidgets.QGroupBox):
         self.filtersChanged.emit()
 
     def _handle_rarity_menu(self) -> None:
-        self._update_button_label(self.rarity_button, "Усі рідкості", self.selected_rarities())
+        self._update_button_label(
+            self.rarity_button, self._translator.t("filters_all_rarities"), self.selected_rarities()
+        )
 
     def _handle_crate_menu(self) -> None:
-        self._update_button_label(self.crates_button, "Усі крейти", self.selected_crates())
+        self._update_button_label(
+            self.crates_button, self._translator.t("filters_all_crates"), self.selected_crates()
+        )
 
     @staticmethod
     def _update_button_label(
@@ -495,13 +679,13 @@ class FiltersPanel(QtWidgets.QGroupBox):
         elif len(selected) == 1:
             button.setText(next(iter(selected)))
         else:
-            button.setText(f"Обрано: {len(selected)}")
+            button.setText(self._translator.t("filters_selected", count=len(selected)))
 
     def selected_rarities(self) -> Set[str]:
-        return {action.text() for action in self._rarity_actions if action.isChecked()}
+        return {action.data() for action in self._rarity_actions if action.isChecked()}
 
     def selected_crates(self) -> Set[str]:
-        return {action.text() for action in self._crate_actions if action.isChecked()}
+        return {action.data() for action in self._crate_actions if action.isChecked()}
 
     def export_filters(self) -> Dict[str, object]:
         return {
@@ -511,6 +695,26 @@ class FiltersPanel(QtWidgets.QGroupBox):
             "rarities": self.selected_rarities(),
             "crates": self.selected_crates(),
         }
+
+    def retranslate(self) -> None:
+        self.setTitle(self._translator.t("filters_title"))
+        self.priced_only.setText(self._translator.t("filters_priced_only"))
+        self.rarity_button.setText(self._translator.t("filters_all_rarities"))
+        self.crates_button.setText(self._translator.t("filters_all_crates"))
+        self._relabel_actions(self._rarity_actions, self._available_rarities, is_rarity=True)
+        self._relabel_actions(self._crate_actions, self._available_crates, is_rarity=False)
+        self._update_button_label(self.rarity_button, self._translator.t("filters_all_rarities"), self.selected_rarities())
+        self._update_button_label(self.crates_button, self._translator.t("filters_all_crates"), self.selected_crates())
+
+    def _relabel_actions(
+        self, actions: List[QtGui.QAction], options: List[str], *, is_rarity: bool
+    ) -> None:
+        unknown_label = self._translator.t("filters_unknown")
+        unknown_values = {values.get("filters_unknown") for values in Translator._TRANSLATIONS.values()}  # type: ignore[attr-defined]
+        for action, option in zip(actions, options):
+            is_unknown = is_rarity and (not option or option in unknown_values)
+            label = unknown_label if is_unknown else option or unknown_label
+            action.setText(label)
 
     def filter_pairs_for_scan(self, pairs: List[ItemPair]) -> List[ItemPair]:
         rarity_filter = self.selected_rarities()
@@ -528,29 +732,40 @@ class FiltersPanel(QtWidgets.QGroupBox):
 
 
 class SettingsPanel(QtWidgets.QGroupBox):
-    def __init__(self) -> None:
-        super().__init__("Налаштування")
+    languageChanged = QtCore.pyqtSignal(str)
+
+    def __init__(self, translator: Translator) -> None:
+        self._translator = translator
+        super().__init__(self._translator.t("settings_title"))
         self.proxy_input = QtWidgets.QPlainTextEdit()
-        self.proxy_input.setPlaceholderText("Один проксі на рядок у форматі Host:Port[:User:Pass]")
+        self.proxy_input.setPlaceholderText(self._translator.t("settings_proxy_placeholder"))
         self.proxy_input.setFixedHeight(80)
         self.cookies_input = QtWidgets.QPlainTextEdit()
-        self.cookies_input.setPlaceholderText("sessionid=...; steamLoginSecure=...")
+        self.cookies_input.setPlaceholderText(self._translator.t("settings_cookies_placeholder"))
         self.delay_input = QtWidgets.QDoubleSpinBox()
         self.delay_input.setRange(0.05, 10.0)
         self.delay_input.setValue(0.3)
         self.delay_input.setSuffix(" c")
         self.delay_input.setSingleStep(0.05)
+        self.language_input = QtWidgets.QComboBox()
+        for code in self._translator.languages():
+            self.language_input.addItem(self._translator.language_label(code), code)
+        self.language_input.currentIndexChanged.connect(self._emit_language_change)
 
         form = QtWidgets.QFormLayout()
-        form.addRow("Проксі", self.proxy_input)
-        form.addRow("Кукіс", self.cookies_input)
-        form.addRow("Затримка", self.delay_input)
+        form.addRow(self._translator.t("settings_proxy"), self.proxy_input)
+        form.addRow(self._translator.t("settings_cookies"), self.cookies_input)
+        form.addRow(self._translator.t("settings_delay"), self.delay_input)
+        form.addRow(self._translator.t("settings_language"), self.language_input)
         self.setLayout(form)
 
     def load(self, settings: Dict[str, object]) -> None:
         proxy_value = settings.get("proxy", "")
         cookies_value = settings.get("cookies", "")
         delay_value = settings.get("delay", 0.3)
+        language = settings.get("language")
+        if isinstance(language, str):
+            self._translator.set_language(language)
         self.proxy_input.setPlainText(str(proxy_value) if proxy_value is not None else "")
         self.cookies_input.setPlainText(str(cookies_value) if cookies_value is not None else "")
         try:
@@ -558,6 +773,18 @@ class SettingsPanel(QtWidgets.QGroupBox):
         except (TypeError, ValueError):
             delay = 0.3
         self.delay_input.setValue(delay)
+        self._select_language(self._translator.language)
+
+    def _select_language(self, code: str) -> None:
+        for index in range(self.language_input.count()):
+            if self.language_input.itemData(index) == code:
+                self.language_input.setCurrentIndex(index)
+                break
+
+    def _emit_language_change(self) -> None:
+        code = self.language_input.currentData()
+        if isinstance(code, str):
+            self.languageChanged.emit(code)
 
     def to_runtime_settings(self) -> RuntimeSettings:
         proxy_text = self.proxy_input.toPlainText().strip()
@@ -578,16 +805,42 @@ class SettingsPanel(QtWidgets.QGroupBox):
             "proxy": self.proxy_input.toPlainText().strip(),
             "cookies": self.cookies_input.toPlainText().strip(),
             "delay": self.delay_input.value(),
+            "language": self.language_input.currentData(),
         }
+
+    def retranslate(self) -> None:
+        self.setTitle(self._translator.t("settings_title"))
+        self.proxy_input.setPlaceholderText(self._translator.t("settings_proxy_placeholder"))
+        self.cookies_input.setPlaceholderText(self._translator.t("settings_cookies_placeholder"))
+        for index in range(self.language_input.count()):
+            code = self.language_input.itemData(index)
+            if isinstance(code, str):
+                self.language_input.setItemText(index, self._translator.language_label(code))
+        form = self.layout()
+        if isinstance(form, QtWidgets.QFormLayout):
+            form.labelForField(self.proxy_input).setText(self._translator.t("settings_proxy"))
+            form.labelForField(self.cookies_input).setText(self._translator.t("settings_cookies"))
+            form.labelForField(self.delay_input).setText(self._translator.t("settings_delay"))
+            form.labelForField(self.language_input).setText(self._translator.t("settings_language"))
 
 
 class MainWindow(QtWidgets.QWidget):
-    def __init__(self, pairs: List[ItemPair], cache: MarketCache, rarities: List[str], crates: List[str]) -> None:
+    def __init__(
+        self,
+        pairs: List[ItemPair],
+        cache: MarketCache,
+        rarities: List[str],
+        crates: List[str],
+        translator: Translator,
+        settings: Optional[Dict[str, object]] = None,
+    ) -> None:
         super().__init__()
         self._pairs = pairs
         self._cache = cache
         self._available_rarities = rarities
         self._available_crates = crates
+        self._translator = translator
+        self._settings_data = settings or {}
         self._worker_thread: Optional[QtCore.QThread] = None
         self._worker: Optional[ScanWorker] = None
         self._row_prices = {
@@ -599,11 +852,18 @@ class MainWindow(QtWidgets.QWidget):
         self.resize(1100, 700)
         self._init_ui()
         self._load_settings()
+        self._retranslate_ui()
 
     def _init_ui(self) -> None:
         self.table_model = QtGui.QStandardItemModel(0, 5)
         self.table_model.setHorizontalHeaderLabels(
-            ["Назва слабу", "Назва стікеру", "Ціна слабу", "Ціна стікеру", "Різниця"]
+            [
+                self._translator.t("table_slab"),
+                self._translator.t("table_sticker"),
+                self._translator.t("table_slab_price"),
+                self._translator.t("table_sticker_price"),
+                self._translator.t("table_difference"),
+            ]
         )
         for pair in self._pairs:
             self.table_model.appendRow(self._build_row_items(pair))
@@ -623,12 +883,18 @@ class MainWindow(QtWidgets.QWidget):
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
         )
 
-        self.filters_panel = FiltersPanel(self._available_rarities, self._available_crates)
+        self.filters_panel = FiltersPanel(self._available_rarities, self._available_crates, self._translator)
         self.filters_panel.filtersChanged.connect(self._apply_filters)
 
         self.manual_model = QtGui.QStandardItemModel(0, 5)
         self.manual_model.setHorizontalHeaderLabels(
-            ["Назва слабу", "Назва стікеру", "Ціна слабу", "Ціна стікеру", "Різниця"]
+            [
+                self._translator.t("table_slab"),
+                self._translator.t("table_sticker"),
+                self._translator.t("table_slab_price"),
+                self._translator.t("table_sticker_price"),
+                self._translator.t("table_difference"),
+            ]
         )
         self.manual_table_view = QtWidgets.QTableView()
         self.manual_table_view.setModel(self.manual_model)
@@ -642,7 +908,7 @@ class MainWindow(QtWidgets.QWidget):
         )
 
         self.manual_search_input = QtWidgets.QLineEdit()
-        self.manual_search_input.setPlaceholderText("Введіть назву стікеру або слабу...")
+        self.manual_search_input.setPlaceholderText(self._translator.t("manual_placeholder"))
         self.manual_results_list = QtWidgets.QListWidget()
         self.manual_results_list.setMaximumHeight(150)
         self.manual_results_list.setStyleSheet(
@@ -655,9 +921,9 @@ class MainWindow(QtWidgets.QWidget):
 
         self._search_entries = self._build_search_entries()
 
-        self.save_base_button = QtWidgets.QPushButton("Зберегти базу")
+        self.save_base_button = QtWidgets.QPushButton(self._translator.t("manual_save"))
         self.save_base_button.clicked.connect(self._save_manual_base)
-        self.import_base_button = QtWidgets.QPushButton("Імпортувати базу")
+        self.import_base_button = QtWidgets.QPushButton(self._translator.t("manual_import"))
         self.import_base_button.clicked.connect(self._import_manual_base)
 
         manual_controls = QtWidgets.QHBoxLayout()
@@ -667,7 +933,8 @@ class MainWindow(QtWidgets.QWidget):
 
         manual_tab = QtWidgets.QWidget()
         manual_layout = QtWidgets.QVBoxLayout()
-        manual_layout.addWidget(QtWidgets.QLabel("Пошук пар"))
+        self.manual_search_label = QtWidgets.QLabel(self._translator.t("manual_search"))
+        manual_layout.addWidget(self.manual_search_label)
         manual_layout.addWidget(self.manual_search_input)
         manual_layout.addWidget(self.manual_results_list)
         manual_layout.addWidget(self.manual_table_view)
@@ -682,15 +949,16 @@ class MainWindow(QtWidgets.QWidget):
         all_pairs_tab.setLayout(all_layout)
 
         self.tabs = QtWidgets.QTabWidget()
-        self.tabs.addTab(all_pairs_tab, "Усі пари")
-        self.tabs.addTab(self.manual_tab, "Обрані пари")
+        self.tabs.addTab(all_pairs_tab, self._translator.t("tab_all_pairs"))
+        self.tabs.addTab(self.manual_tab, self._translator.t("tab_selected_pairs"))
 
-        self.settings_panel = SettingsPanel()
+        self.settings_panel = SettingsPanel(self._translator)
+        self.settings_panel.languageChanged.connect(self._change_language)
 
-        self.status_label = QtWidgets.QLabel("Готово")
+        self.status_label = QtWidgets.QLabel(self._translator.t("status_ready"))
         self.status_label.setStyleSheet("color: #58a6ff; font-weight: bold;")
 
-        self.scan_button = QtWidgets.QPushButton("Старт сканування")
+        self.scan_button = QtWidgets.QPushButton(self._translator.t("scan_start"))
         self.scan_button.setCheckable(True)
         self.scan_button.clicked.connect(self._toggle_scan)
         self.scan_button.setStyleSheet(
@@ -746,20 +1014,70 @@ class MainWindow(QtWidgets.QWidget):
         for pair in self._pairs:
             entries.append(
                 {
-                    "label": f"{pair.slab_name} — слаб",
+                    "label": f"{pair.slab_name} {self._translator.t('manual_label_slab')}",
                     "search": pair.slab_name.lower(),
                     "pair_index": pair.index,
                 }
             )
             entries.append(
                 {
-                    "label": f"{pair.sticker_name} — стікер",
+                    "label": f"{pair.sticker_name} {self._translator.t('manual_label_sticker')}",
                     "search": pair.sticker_name.lower(),
                     "pair_index": pair.index,
                 }
             )
         entries.sort(key=lambda item: item["label"])
         return entries
+
+    def _retranslate_ui(self) -> None:
+        headers = [
+            self._translator.t("table_slab"),
+            self._translator.t("table_sticker"),
+            self._translator.t("table_slab_price"),
+            self._translator.t("table_sticker_price"),
+            self._translator.t("table_difference"),
+        ]
+        self.table_model.setHorizontalHeaderLabels(headers)
+        self.manual_model.setHorizontalHeaderLabels(headers)
+        self.filters_panel.retranslate()
+        self.settings_panel.retranslate()
+        self.manual_search_input.setPlaceholderText(self._translator.t("manual_placeholder"))
+        self.manual_search_label.setText(self._translator.t("manual_search"))
+        self.save_base_button.setText(self._translator.t("manual_save"))
+        self.import_base_button.setText(self._translator.t("manual_import"))
+        self.tabs.setTabText(0, self._translator.t("tab_all_pairs"))
+        self.tabs.setTabText(1, self._translator.t("tab_selected_pairs"))
+        self.scan_button.setText(self._translator.t("scan_stop") if self._worker_thread else self._translator.t("scan_start"))
+        self._translate_status_label()
+        self._search_entries = self._build_search_entries()
+        self._update_manual_results(self.manual_search_input.text())
+        self._refresh_difference_labels()
+
+    def _translate_status_label(self) -> None:
+        current = self.status_label.text()
+        for key in (
+            "status_ready",
+            "status_scanning",
+            "status_stopped",
+            "status_add_pairs",
+            "status_no_results",
+        ):
+            for lang, values in Translator._TRANSLATIONS.items():  # type: ignore[attr-defined]
+                if current == values.get(key):
+                    self.status_label.setText(self._translator.t(key))
+                    return
+
+    def _refresh_difference_labels(self) -> None:
+        for row in range(self.table_model.rowCount()):
+            self._update_difference_for_model(self.table_model, row, row)
+        for row, pair_index in self._manual_row_pairs.items():
+            self._update_difference_for_model(self.manual_model, row, pair_index)
+
+    def _change_language(self, code: str) -> None:
+        self._translator.set_language(code)
+        self.settings_panel._select_language(code)
+        self._retranslate_ui()
+        self._save_settings()
 
     def _update_manual_results(self, text: str) -> None:
         query = text.strip().lower()
@@ -854,24 +1172,32 @@ class MainWindow(QtWidgets.QWidget):
     def _save_manual_base(self) -> None:
         selected_pairs = self._collect_manual_pairs()
         if not selected_pairs:
-            QtWidgets.QMessageBox.warning(self, "Порожній список", "Немає пар для збереження")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._translator.t("message_empty_list"),
+                self._translator.t("message_no_pairs_to_save"),
+            )
             return
         base_name, ok = QtWidgets.QInputDialog.getText(
             self,
-            "Назва бази",
-            "Введіть назву бази",
+            self._translator.t("message_base_name"),
+            self._translator.t("message_enter_base_name"),
             text="my_pairs",
         )
         if not ok:
             return
         safe_name = self._sanitize_base_name(base_name)
         if not safe_name:
-            QtWidgets.QMessageBox.warning(self, "Помилка", "Некоректна назва бази")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._translator.t("message_error"),
+                self._translator.t("message_invalid_base_name"),
+            )
             return
         default_path = BASE_DIR / f"{safe_name}.json"
         file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
-            "Зберегти базу",
+            self._translator.t("message_save_base"),
             str(default_path),
             "JSON (*.json)",
         )
@@ -893,14 +1219,16 @@ class MainWindow(QtWidgets.QWidget):
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
             )
         except OSError as exc:
-            QtWidgets.QMessageBox.critical(self, "Помилка", str(exc))
+            QtWidgets.QMessageBox.critical(self, self._translator.t("message_error"), str(exc))
             return
-        QtWidgets.QMessageBox.information(self, "Готово", "Базу збережено")
+        QtWidgets.QMessageBox.information(
+            self, self._translator.t("message_done"), self._translator.t("message_base_saved")
+        )
 
     def _import_manual_base(self) -> None:
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            "Імпортувати базу",
+            self._translator.t("message_import_base"),
             str(BASE_DIR),
             "JSON (*.json)",
         )
@@ -909,11 +1237,19 @@ class MainWindow(QtWidgets.QWidget):
         try:
             data = json.loads(Path(file_path).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            QtWidgets.QMessageBox.critical(self, "Помилка", f"Не вдалося прочитати файл: {exc}")
+            QtWidgets.QMessageBox.critical(
+                self,
+                self._translator.t("message_error"),
+                self._translator.t("message_file_read_error", exc=exc),
+            )
             return
         pairs_data = data.get("pairs")
         if not isinstance(pairs_data, list):
-            QtWidgets.QMessageBox.warning(self, "Помилка", "Некоректний формат файлу")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._translator.t("message_error"),
+                self._translator.t("message_invalid_file"),
+            )
             return
         self._clear_manual_pairs()
         missing = 0
@@ -935,10 +1271,10 @@ class MainWindow(QtWidgets.QWidget):
                 continue
             self._add_manual_pair(pair)
             added += 1
-        message = f"Імпортовано {added} пар"
+        message = self._translator.t("message_import_result", added=added)
         if missing:
-            message += f", пропущено {missing}"
-        QtWidgets.QMessageBox.information(self, "Результат", message)
+            message += self._translator.t("message_import_skipped", missing=missing)
+        QtWidgets.QMessageBox.information(self, self._translator.t("message_result"), message)
 
     @staticmethod
     def _sanitize_base_name(name: str) -> str:
@@ -1019,23 +1355,19 @@ class MainWindow(QtWidgets.QWidget):
             item.setData(diff, QtCore.Qt.ItemDataRole.UserRole)
             item.setData(diff, DIFFERENCE_ROLE)
         else:
-            item.setText("Очікуємо дані")
+            item.setText(self._translator.t("waiting_data"))
             item.setData(None, QtCore.Qt.ItemDataRole.UserRole)
             item.setData(None, DIFFERENCE_ROLE)
         item.setEditable(False)
 
     def _load_settings(self) -> None:
-        if SETTINGS_FILE.exists():
-            try:
-                settings_data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                settings_data = {}
-        else:
-            settings_data = {}
+        settings_data = self._settings_data or load_settings_file()
         self.settings_panel.load(settings_data)
+        self._settings_data = settings_data
 
     def _save_settings(self) -> None:
-        SETTINGS_FILE.write_text(json.dumps(self.settings_panel.export_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
+        self._settings_data = self.settings_panel.export_dict()
+        SETTINGS_FILE.write_text(json.dumps(self._settings_data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def _apply_filters(self) -> None:
         if not hasattr(self, "proxy_model"):
@@ -1057,14 +1389,14 @@ class MainWindow(QtWidgets.QWidget):
         scan_pairs, mode = self._selected_pairs_for_scan()
         if not scan_pairs:
             if mode == "manual":
-                self.status_label.setText("Додайте пари у вкладці 'Обрані пари'")
+                self.status_label.setText(self._translator.t("status_add_pairs"))
             else:
-                self.status_label.setText("Немає предметів, що відповідають фільтрам")
+                self.status_label.setText(self._translator.t("status_no_results"))
             self.scan_button.setChecked(False)
             return
         runtime_settings = self.settings_panel.to_runtime_settings()
-        client = MarketClient(self._cache, runtime_settings)
-        self._worker = ScanWorker(scan_pairs, client)
+        client = MarketClient(self._cache, runtime_settings, self._translator)
+        self._worker = ScanWorker(scan_pairs, client, self._translator)
         self._worker_thread = QtCore.QThread(self)
         self._worker.moveToThread(self._worker_thread)
         self._worker_thread.started.connect(self._worker.run)
@@ -1073,8 +1405,8 @@ class MainWindow(QtWidgets.QWidget):
         self._worker.progressMessage.connect(self._update_status)
         self._worker.finished.connect(self._handle_finished)
         self._worker_thread.start()
-        self.scan_button.setText("Зупинити сканування")
-        self.status_label.setText("Сканування...")
+        self.scan_button.setText(self._translator.t("scan_stop"))
+        self.status_label.setText(self._translator.t("status_scanning"))
 
     def _stop_worker(self) -> None:
         if self._worker:
@@ -1085,8 +1417,8 @@ class MainWindow(QtWidgets.QWidget):
             self._worker_thread = None
         self._worker = None
         self.scan_button.setChecked(False)
-        self.scan_button.setText("Старт сканування")
-        self.status_label.setText("Зупинено")
+        self.scan_button.setText(self._translator.t("scan_start"))
+        self.status_label.setText(self._translator.t("status_stopped"))
         self._cache.flush()
 
     @QtCore.pyqtSlot(int, bool, float)
@@ -1110,9 +1442,9 @@ class MainWindow(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def _handle_finished(self) -> None:
         self._cache.flush()
-        self.status_label.setText("Готово")
+        self.status_label.setText(self._translator.t("status_ready"))
         self.scan_button.setChecked(False)
-        self.scan_button.setText("Старт сканування")
+        self.scan_button.setText(self._translator.t("scan_start"))
         if self._worker_thread:
             self._worker_thread.quit()
             self._worker_thread.wait()
@@ -1124,7 +1456,7 @@ class MainWindow(QtWidgets.QWidget):
         super().closeEvent(event)
 
 
-def load_pairs() -> Tuple[List[ItemPair], List[str], List[str]]:
+def load_pairs(translator: Translator) -> Tuple[List[ItemPair], List[str], List[str]]:
     stickers = json.loads(STICKERS_FILE.read_text(encoding="utf-8"))
     slabs = json.loads(SLABS_FILE.read_text(encoding="utf-8"))
     pairs: List[ItemPair] = []
@@ -1135,7 +1467,7 @@ def load_pairs() -> Tuple[List[ItemPair], List[str], List[str]]:
         slab_name = slab.get("market_hash_name") or slab.get("name")
         if not sticker_name or not slab_name:
             continue
-        rarity_name = (sticker.get("rarity") or {}).get("name") or "Невідомо"
+        rarity_name = (sticker.get("rarity") or {}).get("name") or translator.t("filters_unknown")
         crate_names = tuple(
             crate.get("name")
             for crate in sticker.get("crates", [])
@@ -1156,12 +1488,15 @@ def load_pairs() -> Tuple[List[ItemPair], List[str], List[str]]:
 
 
 def main() -> None:
-    pairs, rarities, crates = load_pairs()
+    settings_data = load_settings_file()
+    language = str(settings_data.get("language") or Translator.DEFAULT_LANGUAGE)
+    translator = Translator(language)
+    pairs, rarities, crates = load_pairs(translator)
     if not pairs:
-        raise SystemExit("Немає доступних пар предметів")
+        raise SystemExit(translator.t("no_pairs_available"))
     cache = MarketCache(CACHE_FILE)
     app = QtWidgets.QApplication([])
-    window = MainWindow(pairs, cache, rarities, crates)
+    window = MainWindow(pairs, cache, rarities, crates, translator, settings=settings_data)
     window.show()
     app.exec()
     cache.flush()
