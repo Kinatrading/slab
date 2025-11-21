@@ -24,6 +24,7 @@ STICKERS_FILE = BASE_DIR / "stickers_clean.json"
 SLABS_FILE = BASE_DIR / "stickers_slab_clean.json"
 CACHE_FILE = BASE_DIR / "market_cache.json"
 SETTINGS_FILE = BASE_DIR / "settings.json"
+ITEM_NAMEIDS_FILE = BASE_DIR / "item_nameids.json"
 
 
 class Translator:
@@ -279,6 +280,39 @@ class MarketCache:
             self._dirty = False
 
 
+class ItemNameIdStore:
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._lock = threading.Lock()
+        if path.exists():
+            try:
+                self._data = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                self._data = {}
+        else:
+            self._data = {}
+        self._dirty = False
+
+    def get(self, market_name: str) -> Optional[str]:
+        with self._lock:
+            value = self._data.get(market_name)
+            if isinstance(value, str):
+                return value
+            return None
+
+    def set(self, market_name: str, item_nameid: str) -> None:
+        with self._lock:
+            self._data[market_name] = item_nameid
+            self._dirty = True
+
+    def flush(self) -> None:
+        with self._lock:
+            if not self._dirty:
+                return
+            self._path.write_text(json.dumps(self._data, indent=2, ensure_ascii=False), encoding="utf-8")
+            self._dirty = False
+
+
 class MarketClient:
     LISTING_URL = "https://steamcommunity.com/market/listings/730/{name}?l=english"
     LISTING_RENDER_URL = (
@@ -288,8 +322,11 @@ class MarketClient:
         "https://steamcommunity.com/market/itemordershistogram?country=UA&language=english&currency=18&item_nameid={item_nameid}"
     )
 
-    def __init__(self, cache: MarketCache, settings: RuntimeSettings, translator: Translator) -> None:
+    def __init__(
+        self, cache: MarketCache, item_store: ItemNameIdStore, settings: RuntimeSettings, translator: Translator
+    ) -> None:
         self._cache = cache
+        self._item_store = item_store
         self._settings = settings
         self._translator = translator
         self._session = requests.Session()
@@ -403,9 +440,14 @@ class MarketClient:
             return response
 
     def ensure_item_nameid(self, market_name: str) -> str:
+        cached = self._item_store.get(market_name)
+        if cached:
+            print(f"[DEBUG] item_nameid для '{market_name}' з item store: {cached}")
+            return cached
         cached = self._cache.get_item_nameid(market_name)
         if cached:
             print(f"[DEBUG] item_nameid для '{market_name}' з кешу: {cached}")
+            self._item_store.set(market_name, cached)
             return cached
         encoded = quote(market_name, safe="")
         try:
@@ -414,6 +456,7 @@ class MarketClient:
             print(f"[DEBUG] Render JSON без item_nameid для '{market_name}': {exc}")
             item_nameid = self._fetch_item_nameid_from_html(encoded, market_name)
         self._cache.set_item_nameid(market_name, item_nameid)
+        self._item_store.set(market_name, item_nameid)
         print(f"[DEBUG] item_nameid знайдено для '{market_name}': {item_nameid}")
         return item_nameid
 
@@ -851,6 +894,7 @@ class MainWindow(QtWidgets.QWidget):
         self,
         pairs: List[ItemPair],
         cache: MarketCache,
+        item_store: ItemNameIdStore,
         rarities: List[str],
         crates: List[str],
         translator: Translator,
@@ -859,6 +903,7 @@ class MainWindow(QtWidgets.QWidget):
         super().__init__()
         self._pairs = pairs
         self._cache = cache
+        self._item_store = item_store
         self._available_rarities = rarities
         self._available_crates = crates
         self._translator = translator
@@ -1652,7 +1697,7 @@ class MainWindow(QtWidgets.QWidget):
             self.scan_button.setChecked(False)
             return
         runtime_settings = self.settings_panel.to_runtime_settings()
-        client = MarketClient(self._cache, runtime_settings, self._translator)
+        client = MarketClient(self._cache, self._item_store, runtime_settings, self._translator)
         self._worker = ScanWorker(scan_pairs, client, self._translator)
         self._worker_thread = QtCore.QThread(self)
         self._worker.moveToThread(self._worker_thread)
@@ -1677,6 +1722,7 @@ class MainWindow(QtWidgets.QWidget):
         self.scan_button.setText(self._translator.t("scan_start"))
         self.status_label.setText(self._translator.t("status_stopped"))
         self._cache.flush()
+        self._item_store.flush()
 
     @QtCore.pyqtSlot(int, bool, float)
     def _handle_price_update(self, index: int, is_slab: bool, price: float) -> None:
@@ -1699,6 +1745,7 @@ class MainWindow(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def _handle_finished(self) -> None:
         self._cache.flush()
+        self._item_store.flush()
         self.status_label.setText(self._translator.t("status_ready"))
         self.scan_button.setChecked(False)
         self.scan_button.setText(self._translator.t("scan_start"))
@@ -1752,11 +1799,13 @@ def main() -> None:
     if not pairs:
         raise SystemExit(translator.t("no_pairs_available"))
     cache = MarketCache(CACHE_FILE)
+    item_store = ItemNameIdStore(ITEM_NAMEIDS_FILE)
     app = QtWidgets.QApplication([])
-    window = MainWindow(pairs, cache, rarities, crates, translator, settings=settings_data)
+    window = MainWindow(pairs, cache, item_store, rarities, crates, translator, settings=settings_data)
     window.show()
     app.exec()
     cache.flush()
+    item_store.flush()
 
 
 if __name__ == "__main__":
