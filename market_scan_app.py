@@ -1007,9 +1007,12 @@ class MainWindow(QtWidgets.QWidget):
         self.table_view = QtWidgets.QTableView()
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSortingEnabled(True)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.setAlternatingRowColors(True)
+        self.table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
         self.table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1031,10 +1034,13 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.manual_table_view = QtWidgets.QTableView()
         self.manual_table_view.setModel(self.manual_model)
-        self.manual_table_view.horizontalHeader().setStretchLastSection(True)
+        self.manual_table_view.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
         self.manual_table_view.verticalHeader().setVisible(False)
         self.manual_table_view.setAlternatingRowColors(True)
         self.manual_table_view.setSortingEnabled(False)
+        self.manual_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
         self.manual_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1053,10 +1059,13 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.inventory_table_view = QtWidgets.QTableView()
         self.inventory_table_view.setModel(self.inventory_model)
-        self.inventory_table_view.horizontalHeader().setStretchLastSection(True)
+        self.inventory_table_view.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
         self.inventory_table_view.verticalHeader().setVisible(False)
         self.inventory_table_view.setAlternatingRowColors(True)
         self.inventory_table_view.setSortingEnabled(True)
+        self.inventory_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
         self.inventory_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
