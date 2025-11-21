@@ -1296,8 +1296,9 @@ class MainWindow(QtWidgets.QWidget):
             return
         self.inventory_status_label.setText(self._translator.t("inventory_status_loading"))
         self.inventory_fetch_button.setEnabled(False)
+        session, proxies = self._inventory_request_options()
         try:
-            response = requests.get(url, timeout=20)
+            response = session.get(url, timeout=20, proxies=proxies)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as exc:
@@ -1344,6 +1345,28 @@ class MainWindow(QtWidgets.QWidget):
         else:
             self.inventory_status_label.setText(self._translator.t("inventory_status_no_pairs"))
         self.inventory_fetch_button.setEnabled(True)
+
+    def _inventory_request_options(self) -> Tuple[requests.Session, Optional[Dict[str, str]]]:
+        settings = self.settings_panel.to_runtime_settings()
+        session = requests.Session()
+        session.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
+        if settings.cookies:
+            session.cookies.update(settings.cookies)
+        proxy = None
+        if settings.proxies:
+            formatted = MarketClient._format_proxy(settings.proxies[0])
+            if formatted:
+                proxy = {"http": formatted, "https": formatted}
+        return session, proxy
 
     @staticmethod
     def _extract_stickers_from_inventory(data: object) -> List[str]:
