@@ -353,6 +353,7 @@ class MarketClient:
         self._proxy_index = 0
         self._proxy_rotation_hits = 0
         self._status_callback: Optional[Callable[[str], None]] = None
+        self._stop_event: Optional[threading.Event] = None
         self._lock = threading.Lock()
         self._last_request = 0.0
 
@@ -374,6 +375,9 @@ class MarketClient:
 
     def set_status_callback(self, callback: Callable[[str], None]) -> None:
         self._status_callback = callback
+
+    def set_stop_event(self, stop_event: Optional[threading.Event]) -> None:
+        self._stop_event = stop_event
 
     def _emit_status(self, message: str) -> None:
         if self._status_callback:
@@ -415,16 +419,30 @@ class MarketClient:
                 wait_message = self._translator.t("status_all_proxies_wait")
                 print(f"[DEBUG] {wait_message}")
                 self._emit_status(wait_message)
-                time.sleep(600)
+                self._sleep_with_stop_check(600)
                 self._proxy_rotation_hits = 0
         else:
             wait_message = self._translator.t("status_no_proxy_wait")
             print(f"[DEBUG] {wait_message}")
             self._emit_status(wait_message)
-            time.sleep(600)
+            self._sleep_with_stop_check(600)
+
+    def _sleep_with_stop_check(self, duration: float) -> None:
+        if duration <= 0:
+            return
+        remaining = duration
+        interval = 0.5
+        while remaining > 0:
+            if self._stop_event and self._stop_event.is_set():
+                raise RuntimeError(self._translator.t("status_stopped"))
+            sleep_time = min(interval, remaining)
+            time.sleep(sleep_time)
+            remaining -= sleep_time
 
     def _request(self, url: str) -> requests.Response:
         while True:
+            if self._stop_event and self._stop_event.is_set():
+                raise RuntimeError(self._translator.t("status_stopped"))
             proxy_hint = (
                 f"{self._proxy_index + 1}/{len(self._proxy_pool)}" if self._proxy_pool else "off"
             )
@@ -525,6 +543,7 @@ class ScanWorker(QtCore.QObject):
         self._translator = translator
         self._stop_event = threading.Event()
         self._client.set_status_callback(self.progressMessage.emit)
+        self._client.set_stop_event(self._stop_event)
 
     @QtCore.pyqtSlot()
     def run(self) -> None:
