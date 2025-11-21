@@ -59,6 +59,7 @@ class Translator:
             "manual_search": "Пошук пар",
             "tab_all_pairs": "Усі пари",
             "tab_selected_pairs": "Обрані пари",
+            "tab_inventory_pairs": "Інвентар",
             "status_ready": "Готово",
             "status_scanning": "Сканування...",
             "status_stopped": "Зупинено",
@@ -95,6 +96,16 @@ class Translator:
             "missing_item_nameid": "Не вдалося знайти item_nameid для {name}",
             "invalid_json": "Некоректний JSON для {name}",
             "invalid_highest": "Неправильний формат highest_buy_order для {name}",
+            "inventory_link_label": "Посилання на інвентар",
+            "inventory_fetch": "Отримати стікери",
+            "inventory_placeholder": "https://steamcommunity.com/id/.../inventory",
+            "inventory_status_idle": "Очікуємо посилання",
+            "inventory_status_loading": "Завантаження інвентарю...",
+            "inventory_status_error": "Помилка: {details}",
+            "inventory_status_no_stickers": "Стікери не знайдені",
+            "inventory_status_no_pairs": "Немає пар для знайдених стікерів",
+            "inventory_status_found": "Знайдено {count} стікерів",
+            "inventory_invalid_link": "Некоректне посилання",
         },
         "en": {
             "filters_title": "Filters",
@@ -125,6 +136,7 @@ class Translator:
             "manual_search": "Pair search",
             "tab_all_pairs": "All pairs",
             "tab_selected_pairs": "Selected pairs",
+            "tab_inventory_pairs": "Inventory",
             "status_ready": "Ready",
             "status_scanning": "Scanning...",
             "status_stopped": "Stopped",
@@ -161,6 +173,16 @@ class Translator:
             "missing_item_nameid": "Could not find item_nameid for {name}",
             "invalid_json": "Invalid JSON for {name}",
             "invalid_highest": "Invalid highest_buy_order format for {name}",
+            "inventory_link_label": "Inventory link",
+            "inventory_fetch": "Fetch stickers",
+            "inventory_placeholder": "https://steamcommunity.com/id/.../inventory",
+            "inventory_status_idle": "Waiting for link",
+            "inventory_status_loading": "Loading inventory...",
+            "inventory_status_error": "Error: {details}",
+            "inventory_status_no_stickers": "No stickers found",
+            "inventory_status_no_pairs": "No pairs for found stickers",
+            "inventory_status_found": "Found {count} stickers",
+            "inventory_invalid_link": "Invalid link",
         },
     }
 
@@ -848,6 +870,8 @@ class MainWindow(QtWidgets.QWidget):
         }
         self._manual_rows: Dict[int, int] = {}
         self._manual_row_pairs: Dict[int, int] = {}
+        self._inventory_rows: Dict[int, int] = {}
+        self._inventory_pairs: List[ItemPair] = []
         self.setWindowTitle("Steam Sticker Scanner")
         self.resize(1100, 700)
         self._init_ui()
@@ -907,6 +931,27 @@ class MainWindow(QtWidgets.QWidget):
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
         )
 
+        self.inventory_model = QtGui.QStandardItemModel(0, 5)
+        self.inventory_model.setHorizontalHeaderLabels(
+            [
+                self._translator.t("table_slab"),
+                self._translator.t("table_sticker"),
+                self._translator.t("table_slab_price"),
+                self._translator.t("table_sticker_price"),
+                self._translator.t("table_difference"),
+            ]
+        )
+        self.inventory_table_view = QtWidgets.QTableView()
+        self.inventory_table_view.setModel(self.inventory_model)
+        self.inventory_table_view.horizontalHeader().setStretchLastSection(True)
+        self.inventory_table_view.verticalHeader().setVisible(False)
+        self.inventory_table_view.setAlternatingRowColors(True)
+        self.inventory_table_view.setSortingEnabled(True)
+        self.inventory_table_view.setStyleSheet(
+            "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
+            "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
+        )
+
         self.manual_search_input = QtWidgets.QLineEdit()
         self.manual_search_input.setPlaceholderText(self._translator.t("manual_placeholder"))
         self.manual_results_list = QtWidgets.QListWidget()
@@ -942,6 +987,25 @@ class MainWindow(QtWidgets.QWidget):
         manual_tab.setLayout(manual_layout)
         self.manual_tab = manual_tab
 
+        inventory_tab = QtWidgets.QWidget()
+        inventory_layout = QtWidgets.QVBoxLayout()
+        inventory_input_row = QtWidgets.QHBoxLayout()
+        self.inventory_link_label = QtWidgets.QLabel(self._translator.t("inventory_link_label"))
+        self.inventory_url_input = QtWidgets.QLineEdit()
+        self.inventory_url_input.setPlaceholderText(self._translator.t("inventory_placeholder"))
+        self.inventory_fetch_button = QtWidgets.QPushButton(self._translator.t("inventory_fetch"))
+        self.inventory_fetch_button.clicked.connect(self._fetch_inventory_pairs)
+        inventory_input_row.addWidget(self.inventory_link_label)
+        inventory_input_row.addWidget(self.inventory_url_input)
+        inventory_input_row.addWidget(self.inventory_fetch_button)
+        self.inventory_status_label = QtWidgets.QLabel(self._translator.t("inventory_status_idle"))
+        self.inventory_status_label.setStyleSheet("color: #58a6ff;")
+        inventory_layout.addLayout(inventory_input_row)
+        inventory_layout.addWidget(self.inventory_status_label)
+        inventory_layout.addWidget(self.inventory_table_view)
+        inventory_tab.setLayout(inventory_layout)
+        self.inventory_tab = inventory_tab
+
         all_pairs_tab = QtWidgets.QWidget()
         all_layout = QtWidgets.QVBoxLayout()
         all_layout.addWidget(self.table_view)
@@ -951,6 +1015,7 @@ class MainWindow(QtWidgets.QWidget):
         self.tabs = QtWidgets.QTabWidget()
         self.tabs.addTab(all_pairs_tab, self._translator.t("tab_all_pairs"))
         self.tabs.addTab(self.manual_tab, self._translator.t("tab_selected_pairs"))
+        self.tabs.addTab(self.inventory_tab, self._translator.t("tab_inventory_pairs"))
 
         self.settings_panel = SettingsPanel(self._translator)
         self.settings_panel.languageChanged.connect(self._change_language)
@@ -1039,16 +1104,22 @@ class MainWindow(QtWidgets.QWidget):
         ]
         self.table_model.setHorizontalHeaderLabels(headers)
         self.manual_model.setHorizontalHeaderLabels(headers)
+        self.inventory_model.setHorizontalHeaderLabels(headers)
         self.filters_panel.retranslate()
         self.settings_panel.retranslate()
         self.manual_search_input.setPlaceholderText(self._translator.t("manual_placeholder"))
         self.manual_search_label.setText(self._translator.t("manual_search"))
         self.save_base_button.setText(self._translator.t("manual_save"))
         self.import_base_button.setText(self._translator.t("manual_import"))
+        self.inventory_link_label.setText(self._translator.t("inventory_link_label"))
+        self.inventory_url_input.setPlaceholderText(self._translator.t("inventory_placeholder"))
+        self.inventory_fetch_button.setText(self._translator.t("inventory_fetch"))
         self.tabs.setTabText(0, self._translator.t("tab_all_pairs"))
         self.tabs.setTabText(1, self._translator.t("tab_selected_pairs"))
+        self.tabs.setTabText(2, self._translator.t("tab_inventory_pairs"))
         self.scan_button.setText(self._translator.t("scan_stop") if self._worker_thread else self._translator.t("scan_start"))
         self._translate_status_label()
+        self._translate_inventory_status_label()
         self._search_entries = self._build_search_entries()
         self._update_manual_results(self.manual_search_input.text())
         self._refresh_difference_labels()
@@ -1067,11 +1138,27 @@ class MainWindow(QtWidgets.QWidget):
                     self.status_label.setText(self._translator.t(key))
                     return
 
+    def _translate_inventory_status_label(self) -> None:
+        current = self.inventory_status_label.text()
+        for key in (
+            "inventory_status_idle",
+            "inventory_status_loading",
+            "inventory_status_no_stickers",
+            "inventory_status_no_pairs",
+            "inventory_status_found",
+        ):
+            for lang, values in Translator._TRANSLATIONS.items():  # type: ignore[attr-defined]
+                if current == values.get(key):
+                    self.inventory_status_label.setText(self._translator.t(key))
+                    return
+
     def _refresh_difference_labels(self) -> None:
         for row in range(self.table_model.rowCount()):
             self._update_difference_for_model(self.table_model, row, row)
         for row, pair_index in self._manual_row_pairs.items():
             self._update_difference_for_model(self.manual_model, row, pair_index)
+        for row, pair_index in self._inventory_rows.items():
+            self._update_difference_for_model(self.inventory_model, row, pair_index)
 
     def _change_language(self, code: str) -> None:
         self._translator.set_language(code)
@@ -1146,10 +1233,33 @@ class MainWindow(QtWidgets.QWidget):
         if updated:
             self._update_difference_for_model(self.manual_model, row, pair_index)
 
+    def _apply_existing_prices_to_inventory_row(self, pair_index: int) -> None:
+        row = self._inventory_rows.get(pair_index)
+        if row is None:
+            return
+        prices = self._row_prices.get(pair_index, {})
+        updated = False
+        for is_slab, key in ((True, "slab"), (False, "sticker")):
+            value = prices.get(key)
+            if value is not None:
+                self._update_model_price_cell(
+                    self.inventory_model,
+                    row,
+                    pair_index,
+                    is_slab,
+                    f"₴{value:.2f}",
+                    value,
+                )
+                updated = True
+        if updated:
+            self._update_difference_for_model(self.inventory_model, row, pair_index)
+
     def _selected_pairs_for_scan(self) -> Tuple[List[ItemPair], str]:
         if self.tabs.currentWidget() == self.manual_tab:
             manual_pairs = self._collect_manual_pairs()
             return manual_pairs, "manual"
+        if self.tabs.currentWidget() == self.inventory_tab:
+            return list(self._inventory_pairs), "inventory"
         return self.filters_panel.filter_pairs_for_scan(self._pairs), "all"
 
     def _collect_manual_pairs(self) -> List[ItemPair]:
@@ -1163,6 +1273,143 @@ class MainWindow(QtWidgets.QWidget):
             except IndexError:
                 continue
         return pairs
+
+    def _normalized_inventory_url(self, raw: str) -> Optional[str]:
+        if not raw:
+            return None
+        url = raw.strip()
+        if not url:
+            return None
+        if "json/730/2" in url:
+            return url
+        url = url.rstrip("/")
+        if not url.endswith("/inventory"):
+            url += "/inventory"
+        return f"{url}/json/730/2?l=english&count=5000"
+
+    def _fetch_inventory_pairs(self) -> None:
+        url = self._normalized_inventory_url(self.inventory_url_input.text())
+        if not url:
+            self.inventory_status_label.setText(
+                self._translator.t("inventory_status_error", details=self._translator.t("inventory_invalid_link"))
+            )
+            return
+        self.inventory_status_label.setText(self._translator.t("inventory_status_loading"))
+        self.inventory_fetch_button.setEnabled(False)
+        session, proxies = self._inventory_request_options()
+        try:
+            response = session.get(url, timeout=20, proxies=proxies)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as exc:
+            self.inventory_status_label.setText(
+                self._translator.t("inventory_status_error", details=str(exc))
+            )
+            self.inventory_fetch_button.setEnabled(True)
+            return
+        except json.JSONDecodeError:
+            self.inventory_status_label.setText(
+                self._translator.t("inventory_status_error", details=self._translator.t("invalid_json", name="inventory"))
+            )
+            self.inventory_fetch_button.setEnabled(True)
+            return
+
+        sticker_names = self._extract_stickers_from_inventory(data)
+        if not sticker_names:
+            self.inventory_status_label.setText(self._translator.t("inventory_status_no_stickers"))
+            self.inventory_model.removeRows(0, self.inventory_model.rowCount())
+            self._inventory_rows.clear()
+            self._inventory_pairs = []
+            self.inventory_fetch_button.setEnabled(True)
+            return
+
+        inventory_pairs: List[ItemPair] = []
+        sticker_set = set(sticker_names)
+        for pair in self._pairs:
+            if pair.sticker_name in sticker_set:
+                inventory_pairs.append(pair)
+
+        self.inventory_model.removeRows(0, self.inventory_model.rowCount())
+        self._inventory_rows.clear()
+        self._inventory_pairs = inventory_pairs
+        for pair in inventory_pairs:
+            self.inventory_model.appendRow(self._build_row_items(pair))
+            row = self.inventory_model.rowCount() - 1
+            self._inventory_rows[pair.index] = row
+            self._apply_existing_prices_to_inventory_row(pair.index)
+
+        if inventory_pairs:
+            self.inventory_status_label.setText(
+                self._translator.t("inventory_status_found", count=len(sticker_names))
+            )
+        else:
+            self.inventory_status_label.setText(self._translator.t("inventory_status_no_pairs"))
+        self.inventory_fetch_button.setEnabled(True)
+
+    def _inventory_request_options(self) -> Tuple[requests.Session, Optional[Dict[str, str]]]:
+        settings = self.settings_panel.to_runtime_settings()
+        session = requests.Session()
+        session.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
+        if settings.cookies:
+            session.cookies.update(settings.cookies)
+        proxy = None
+        if settings.proxies:
+            formatted = MarketClient._format_proxy(settings.proxies[0])
+            if formatted:
+                proxy = {"http": formatted, "https": formatted}
+        return session, proxy
+
+    @staticmethod
+    def _extract_stickers_from_inventory(data: object) -> List[str]:
+        if not isinstance(data, dict):
+            return []
+        inventory = data.get("rgInventory")
+        descriptions = data.get("rgDescriptions")
+        if not isinstance(inventory, dict) or not isinstance(descriptions, dict):
+            return []
+        names: List[str] = []
+        for item in inventory.values():
+            if not isinstance(item, dict):
+                continue
+            classid = item.get("classid")
+            instanceid = item.get("instanceid")
+            if not classid or not instanceid:
+                continue
+            key = f"{classid}_{instanceid}"
+            description = descriptions.get(key)
+            if not isinstance(description, dict):
+                continue
+            if not MainWindow._is_sticker_description(description):
+                continue
+            name = description.get("market_hash_name") or description.get("name")
+            if name:
+                names.append(str(name))
+        return names
+
+    @staticmethod
+    def _is_sticker_description(description: Dict[str, object]) -> bool:
+        tags = description.get("tags")
+        if isinstance(tags, list):
+            for tag in tags:
+                if not isinstance(tag, dict):
+                    continue
+                category = str(tag.get("category") or tag.get("category_name") or "")
+                name = str(tag.get("name") or tag.get("internal_name") or "")
+                if category.lower() == "type" and "sticker" in name.lower():
+                    return True
+        desc_type = description.get("type")
+        if isinstance(desc_type, str) and "sticker" in desc_type.lower():
+            return True
+        return False
 
     def _clear_manual_pairs(self) -> None:
         self.manual_model.removeRows(0, self.manual_model.rowCount())
@@ -1311,6 +1558,16 @@ class MainWindow(QtWidgets.QWidget):
             self._update_model_price_cell(
                 self.manual_model,
                 manual_row,
+                pair_index,
+                is_slab,
+                text,
+                value,
+            )
+        inventory_row = self._inventory_rows.get(pair_index)
+        if inventory_row is not None:
+            self._update_model_price_cell(
+                self.inventory_model,
+                inventory_row,
                 pair_index,
                 is_slab,
                 text,
