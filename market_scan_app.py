@@ -1011,8 +1011,12 @@ class MainWindow(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         self.table_view.verticalHeader().setVisible(False)
+        self.table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.table_view.setAlternatingRowColors(True)
         self.table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.table_view.setWordWrap(True)
         self.table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1038,9 +1042,13 @@ class MainWindow(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         self.manual_table_view.verticalHeader().setVisible(False)
+        self.manual_table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.manual_table_view.setAlternatingRowColors(True)
         self.manual_table_view.setSortingEnabled(False)
         self.manual_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.manual_table_view.setWordWrap(True)
         self.manual_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1063,9 +1071,13 @@ class MainWindow(QtWidgets.QWidget):
             QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         self.inventory_table_view.verticalHeader().setVisible(False)
+        self.inventory_table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.inventory_table_view.setAlternatingRowColors(True)
         self.inventory_table_view.setSortingEnabled(True)
         self.inventory_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.inventory_table_view.setWordWrap(True)
         self.inventory_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
