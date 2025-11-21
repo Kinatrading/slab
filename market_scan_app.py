@@ -19,6 +19,7 @@ RARITY_ROLE = QtCore.Qt.ItemDataRole.UserRole + 3
 CRATES_ROLE = QtCore.Qt.ItemDataRole.UserRole + 4
 DIFFERENCE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 5
 ITEM_NAMEID_ROLE = QtCore.Qt.ItemDataRole.UserRole + 6
+SELL_PRICE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 7
 
 BASE_DIR = Path(__file__).resolve().parent
 STICKERS_FILE = BASE_DIR / "stickers_clean.json"
@@ -52,8 +53,8 @@ class Translator:
             "language_en": "English",
             "table_slab": "Назва слабу",
             "table_sticker": "Назва стікеру",
-            "table_slab_price": "Ціна слабу",
-            "table_sticker_price": "Ціна стікеру",
+            "table_slab_price": "Ціна слабу (купівля/продаж)",
+            "table_sticker_price": "Ціна стікеру (купівля/продаж)",
             "table_item_nameid": "item_nameid",
             "table_difference": "Різниця",
             "manual_placeholder": "Введіть назву стікеру або слабу...",
@@ -109,6 +110,8 @@ class Translator:
             "inventory_status_no_pairs": "Немає пар для знайдених стікерів",
             "inventory_status_found": "Знайдено {count} стікерів",
             "inventory_invalid_link": "Некоректне посилання",
+            "price_buy": "Купівля",
+            "price_sell": "Продаж",
         },
         "en": {
             "filters_title": "Filters",
@@ -130,8 +133,8 @@ class Translator:
             "language_en": "English",
             "table_slab": "Slab name",
             "table_sticker": "Sticker name",
-            "table_slab_price": "Slab price",
-            "table_sticker_price": "Sticker price",
+            "table_slab_price": "Slab price (buy/sell)",
+            "table_sticker_price": "Sticker price (buy/sell)",
             "table_item_nameid": "item_nameid",
             "table_difference": "Difference",
             "manual_placeholder": "Enter sticker or slab name...",
@@ -187,6 +190,8 @@ class Translator:
             "inventory_status_no_pairs": "No pairs for found stickers",
             "inventory_status_found": "Found {count} stickers",
             "inventory_invalid_link": "Invalid link",
+            "price_buy": "Buy",
+            "price_sell": "Sell",
         },
     }
 
@@ -229,6 +234,12 @@ class ItemPair(NamedTuple):
 
 
 @dataclass
+class PriceInfo:
+    buy: Optional[float]
+    sell: Optional[float]
+
+
+@dataclass
 class RuntimeSettings:
     proxies: List[str]
     cookies: Dict[str, str]
@@ -265,9 +276,10 @@ class MarketCache:
         entry["item_nameid"] = item_nameid
         self._mark_dirty()
 
-    def set_price(self, market_name: str, price: float) -> None:
+    def set_price(self, market_name: str, price: PriceInfo) -> None:
         entry = self._ensure_entry(market_name)
-        entry["last_price"] = price
+        entry["last_price"] = price.buy
+        entry["last_sell_price"] = price.sell
         entry["updated_at"] = time.time()
         self._mark_dirty()
 
@@ -506,7 +518,7 @@ class MarketClient:
             raise RuntimeError(self._translator.t("missing_item_nameid", name=market_name))
         return match.group(1)
 
-    def fetch_price(self, market_name: str, item_nameid: Optional[str] = None) -> float:
+    def fetch_price(self, market_name: str, item_nameid: Optional[str] = None) -> PriceInfo:
         item_nameid = item_nameid or self.ensure_item_nameid(market_name)
         url = self.HISTOGRAM_URL.format(item_nameid=item_nameid)
         print(f"[DEBUG] Histogram URL для '{market_name}': {url}")
@@ -517,20 +529,36 @@ class MarketClient:
             print(f"[DEBUG] Не вдалося розпарсити JSON для '{market_name}': {response.text[:500]}")
             raise RuntimeError(self._translator.t("invalid_json", name=market_name)) from exc
         highest = data.get("highest_buy_order")
-        if not highest:
+        lowest = data.get("lowest_sell_order")
+        buy_price: Optional[float]
+        sell_price: Optional[float]
+        if highest:
+            try:
+                buy_price = int(highest) / 100.0
+            except ValueError as exc:
+                raise RuntimeError(self._translator.t("invalid_highest", name=market_name)) from exc
+        else:
             print(f"[DEBUG] highest_buy_order відсутній у відповіді для '{market_name}': {data}")
-            return 0.0
-        try:
-            price = int(highest) / 100.0
-        except ValueError as exc:
-            raise RuntimeError(self._translator.t("invalid_highest", name=market_name)) from exc
-        self._cache.set_price(market_name, price)
-        print(f"[DEBUG] Оновлена ціна '{market_name}': ₴{price:.2f}")
-        return price
+            buy_price = None
+        if lowest:
+            try:
+                sell_price = int(lowest) / 100.0
+            except ValueError:
+                sell_price = None
+        else:
+            sell_price = None
+        price_info = PriceInfo(buy=buy_price, sell=sell_price)
+        self._cache.set_price(market_name, price_info)
+        debug_buy = f"₴{buy_price:.2f}" if buy_price is not None else "—"
+        debug_sell = f"₴{sell_price:.2f}" if sell_price is not None else "—"
+        print(
+            f"[DEBUG] Оновлені ціни '{market_name}': buy={debug_buy}, sell={debug_sell}"
+        )
+        return price_info
 
 
 class ScanWorker(QtCore.QObject):
-    priceUpdated = QtCore.pyqtSignal(int, bool, float)
+    priceUpdated = QtCore.pyqtSignal(int, bool, object)
     priceFailed = QtCore.pyqtSignal(int, bool, str)
     itemIdResolved = QtCore.pyqtSignal(int, bool, str)
     progressMessage = QtCore.pyqtSignal(str)
@@ -574,8 +602,10 @@ class ScanWorker(QtCore.QObject):
                     self.priceFailed.emit(pair.index, is_slab, str(exc))
                     continue
                 self.priceUpdated.emit(pair.index, is_slab, price)
+                buy_text = f"₴{price.buy:.2f}" if price.buy is not None else "—"
+                sell_text = f"₴{price.sell:.2f}" if price.sell is not None else "—"
                 print(
-                    f"[DEBUG] {label} ціна для пари #{pair.index + 1}: ₴{price:.2f}"
+                    f"[DEBUG] {label} ціна для пари #{pair.index + 1}: buy={buy_text}, sell={sell_text}"
                 )
         self.finished.emit()
 
@@ -977,9 +1007,21 @@ class MainWindow(QtWidgets.QWidget):
         self.table_view = QtWidgets.QTableView()
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSortingEnabled(True)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
+        table_header = self.table_view.horizontalHeader()
+        table_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        table_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.table_view.verticalHeader().setVisible(False)
+        self.table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.table_view.setAlternatingRowColors(True)
+        self.table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.table_view.setWordWrap(True)
         self.table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1001,10 +1043,22 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.manual_table_view = QtWidgets.QTableView()
         self.manual_table_view.setModel(self.manual_model)
-        self.manual_table_view.horizontalHeader().setStretchLastSection(True)
+        manual_header = self.manual_table_view.horizontalHeader()
+        manual_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        manual_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        manual_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.manual_table_view.verticalHeader().setVisible(False)
+        self.manual_table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.manual_table_view.setAlternatingRowColors(True)
         self.manual_table_view.setSortingEnabled(False)
+        self.manual_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.manual_table_view.setWordWrap(True)
         self.manual_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1023,10 +1077,22 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.inventory_table_view = QtWidgets.QTableView()
         self.inventory_table_view.setModel(self.inventory_model)
-        self.inventory_table_view.horizontalHeader().setStretchLastSection(True)
+        inventory_header = self.inventory_table_view.horizontalHeader()
+        inventory_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        inventory_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        inventory_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.inventory_table_view.verticalHeader().setVisible(False)
+        self.inventory_table_view.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
         self.inventory_table_view.setAlternatingRowColors(True)
         self.inventory_table_view.setSortingEnabled(True)
+        self.inventory_table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.inventory_table_view.setWordWrap(True)
         self.inventory_table_view.setStyleSheet(
             "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
@@ -1210,6 +1276,25 @@ class MainWindow(QtWidgets.QWidget):
             return "\n".join(parts)
         return "—"
 
+    def _format_price_text(self, price: Optional[PriceInfo]) -> str:
+        buy_label = self._translator.t("price_buy")
+        sell_label = self._translator.t("price_sell")
+        if price is None:
+            buy_text = self._translator.t("waiting_data")
+            sell_text = self._translator.t("waiting_data")
+        else:
+            buy_text = (
+                f"₴{price.buy:.2f}"
+                if price.buy is not None
+                else self._translator.t("waiting_data")
+            )
+            sell_text = (
+                f"₴{price.sell:.2f}"
+                if price.sell is not None
+                else self._translator.t("waiting_data")
+            )
+        return f"{buy_label}: {buy_text}\n{sell_label}: {sell_text}"
+
     def _update_item_nameid_cell(
         self, model: QtGui.QStandardItemModel, row: int, pair_index: int, text: str
     ) -> None:
@@ -1366,7 +1451,6 @@ class MainWindow(QtWidgets.QWidget):
                     row,
                     pair_index,
                     is_slab,
-                    f"₴{value:.2f}",
                     value,
                 )
                 updated = True
@@ -1387,7 +1471,6 @@ class MainWindow(QtWidgets.QWidget):
                     row,
                     pair_index,
                     is_slab,
-                    f"₴{value:.2f}",
                     value,
                 )
                 updated = True
@@ -1682,16 +1765,16 @@ class MainWindow(QtWidgets.QWidget):
         self,
         pair_index: int,
         is_slab: bool,
-        text: str,
-        value: Optional[float],
+        price: Optional[PriceInfo],
+        error_text: Optional[str] = None,
     ) -> None:
         self._update_model_price_cell(
             self.table_model,
             pair_index,
             pair_index,
             is_slab,
-            text,
-            value,
+            price,
+            error_text,
         )
         manual_row = self._manual_rows.get(pair_index)
         if manual_row is not None:
@@ -1700,8 +1783,8 @@ class MainWindow(QtWidgets.QWidget):
                 manual_row,
                 pair_index,
                 is_slab,
-                text,
-                value,
+                price,
+                error_text,
             )
         inventory_row = self._inventory_rows.get(pair_index)
         if inventory_row is not None:
@@ -1710,8 +1793,8 @@ class MainWindow(QtWidgets.QWidget):
                 inventory_row,
                 pair_index,
                 is_slab,
-                text,
-                value,
+                price,
+                error_text,
             )
 
     def _update_model_price_cell(
@@ -1720,8 +1803,8 @@ class MainWindow(QtWidgets.QWidget):
         row: int,
         pair_index: int,
         is_slab: bool,
-        text: str,
-        value: Optional[float],
+        price: Optional[PriceInfo],
+        error_text: Optional[str] = None,
     ) -> None:
         column = 2 if is_slab else 3
         role = SLAB_PRICE_ROLE if is_slab else STICKER_PRICE_ROLE
@@ -1730,9 +1813,15 @@ class MainWindow(QtWidgets.QWidget):
             item = QtGui.QStandardItem("—")
             item.setEditable(False)
             model.setItem(row, column, item)
-        item.setText(text)
-        item.setData(value, QtCore.Qt.ItemDataRole.UserRole)
-        item.setData(value, role)
+        if error_text is not None:
+            item.setText(error_text)
+        else:
+            item.setText(self._format_price_text(price))
+        buy_value = price.buy if price is not None else None
+        sell_value = price.sell if price is not None else None
+        item.setData(buy_value, QtCore.Qt.ItemDataRole.UserRole)
+        item.setData(buy_value, role)
+        item.setData(sell_value, SELL_PRICE_ROLE)
         item.setEditable(False)
         self._update_difference_for_model(model, row, pair_index)
 
@@ -1746,8 +1835,12 @@ class MainWindow(QtWidgets.QWidget):
         prices = self._row_prices.setdefault(pair_index, {})
         slab_price = prices.get("slab")
         sticker_price = prices.get("sticker")
-        if slab_price is not None and sticker_price is not None:
-            diff = slab_price - sticker_price
+        slab_buy = slab_price.buy if isinstance(slab_price, PriceInfo) else slab_price
+        sticker_buy = (
+            sticker_price.buy if isinstance(sticker_price, PriceInfo) else sticker_price
+        )
+        if slab_buy is not None and sticker_buy is not None:
+            diff = slab_buy - sticker_buy
             item.setText(f"₴{diff:.2f}")
             item.setData(diff, QtCore.Qt.ItemDataRole.UserRole)
             item.setData(diff, DIFFERENCE_ROLE)
@@ -1820,18 +1913,18 @@ class MainWindow(QtWidgets.QWidget):
         self._cache.flush()
         self._item_store.flush()
 
-    @QtCore.pyqtSlot(int, bool, float)
-    def _handle_price_update(self, index: int, is_slab: bool, price: float) -> None:
+    @QtCore.pyqtSlot(int, bool, object)
+    def _handle_price_update(self, index: int, is_slab: bool, price: PriceInfo) -> None:
         key = "slab" if is_slab else "sticker"
         self._row_prices.setdefault(index, {})[key] = price
-        self._apply_price_to_models(index, is_slab, f"₴{price:.2f}", price)
+        self._apply_price_to_models(index, is_slab, price)
         self.proxy_model.invalidateFilter()
 
     @QtCore.pyqtSlot(int, bool, str)
     def _handle_price_failure(self, index: int, is_slab: bool, message: str) -> None:
         key = "slab" if is_slab else "sticker"
         self._row_prices.setdefault(index, {})[key] = None
-        self._apply_price_to_models(index, is_slab, message, None)
+        self._apply_price_to_models(index, is_slab, None, message)
         self.proxy_model.invalidateFilter()
 
     @QtCore.pyqtSlot(int, bool, str)
