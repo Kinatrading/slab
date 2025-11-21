@@ -18,6 +18,7 @@ STICKER_PRICE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 2
 RARITY_ROLE = QtCore.Qt.ItemDataRole.UserRole + 3
 CRATES_ROLE = QtCore.Qt.ItemDataRole.UserRole + 4
 DIFFERENCE_ROLE = QtCore.Qt.ItemDataRole.UserRole + 5
+ITEM_NAMEID_ROLE = QtCore.Qt.ItemDataRole.UserRole + 6
 
 BASE_DIR = Path(__file__).resolve().parent
 STICKERS_FILE = BASE_DIR / "stickers_clean.json"
@@ -53,6 +54,7 @@ class Translator:
             "table_sticker": "Назва стікеру",
             "table_slab_price": "Ціна слабу",
             "table_sticker_price": "Ціна стікеру",
+            "table_item_nameid": "item_nameid",
             "table_difference": "Різниця",
             "manual_placeholder": "Введіть назву стікеру або слабу...",
             "manual_save": "Зберегти базу",
@@ -130,6 +132,7 @@ class Translator:
             "table_sticker": "Sticker name",
             "table_slab_price": "Slab price",
             "table_sticker_price": "Sticker price",
+            "table_item_nameid": "item_nameid",
             "table_difference": "Difference",
             "manual_placeholder": "Enter sticker or slab name...",
             "manual_save": "Save base",
@@ -485,8 +488,8 @@ class MarketClient:
             raise RuntimeError(self._translator.t("missing_item_nameid", name=market_name))
         return match.group(1)
 
-    def fetch_price(self, market_name: str) -> float:
-        item_nameid = self.ensure_item_nameid(market_name)
+    def fetch_price(self, market_name: str, item_nameid: Optional[str] = None) -> float:
+        item_nameid = item_nameid or self.ensure_item_nameid(market_name)
         url = self.HISTOGRAM_URL.format(item_nameid=item_nameid)
         print(f"[DEBUG] Histogram URL для '{market_name}': {url}")
         response = self._request(url)
@@ -511,6 +514,7 @@ class MarketClient:
 class ScanWorker(QtCore.QObject):
     priceUpdated = QtCore.pyqtSignal(int, bool, float)
     priceFailed = QtCore.pyqtSignal(int, bool, str)
+    itemIdResolved = QtCore.pyqtSignal(int, bool, str)
     progressMessage = QtCore.pyqtSignal(str)
     finished = QtCore.pyqtSignal()
 
@@ -540,7 +544,9 @@ class ScanWorker(QtCore.QObject):
                     break
                 label = "slab" if is_slab else "sticker"
                 try:
-                    price = self._client.fetch_price(name)
+                    item_nameid = self._client.ensure_item_nameid(name)
+                    self.itemIdResolved.emit(pair.index, is_slab, item_nameid)
+                    price = self._client.fetch_price(name, item_nameid=item_nameid)
                 except Exception as exc:  # noqa: BLE001 - bubble up to UI
                     print(
                         f"[DEBUG] Помилка при обробці пари #{pair.index + 1} ({label}): {exc}"
@@ -913,6 +919,13 @@ class MainWindow(QtWidgets.QWidget):
         self._row_prices = {
             pair.index: {"slab": None, "sticker": None} for pair in self._pairs
         }
+        self._item_nameids = {
+            pair.index: {
+                "sticker": self._lookup_item_nameid(pair.sticker_name),
+                "slab": self._lookup_item_nameid(pair.slab_name),
+            }
+            for pair in self._pairs
+        }
         self._manual_rows: Dict[int, int] = {}
         self._manual_row_pairs: Dict[int, int] = {}
         self._inventory_rows: Dict[int, int] = {}
@@ -924,13 +937,14 @@ class MainWindow(QtWidgets.QWidget):
         self._retranslate_ui()
 
     def _init_ui(self) -> None:
-        self.table_model = QtGui.QStandardItemModel(0, 5)
+        self.table_model = QtGui.QStandardItemModel(0, 6)
         self.table_model.setHorizontalHeaderLabels(
             [
                 self._translator.t("table_slab"),
                 self._translator.t("table_sticker"),
                 self._translator.t("table_slab_price"),
                 self._translator.t("table_sticker_price"),
+                self._translator.t("table_item_nameid"),
                 self._translator.t("table_difference"),
             ]
         )
@@ -955,13 +969,14 @@ class MainWindow(QtWidgets.QWidget):
         self.filters_panel = FiltersPanel(self._available_rarities, self._available_crates, self._translator)
         self.filters_panel.filtersChanged.connect(self._apply_filters)
 
-        self.manual_model = QtGui.QStandardItemModel(0, 5)
+        self.manual_model = QtGui.QStandardItemModel(0, 6)
         self.manual_model.setHorizontalHeaderLabels(
             [
                 self._translator.t("table_slab"),
                 self._translator.t("table_sticker"),
                 self._translator.t("table_slab_price"),
                 self._translator.t("table_sticker_price"),
+                self._translator.t("table_item_nameid"),
                 self._translator.t("table_difference"),
             ]
         )
@@ -976,13 +991,14 @@ class MainWindow(QtWidgets.QWidget):
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
         )
 
-        self.inventory_model = QtGui.QStandardItemModel(0, 5)
+        self.inventory_model = QtGui.QStandardItemModel(0, 6)
         self.inventory_model.setHorizontalHeaderLabels(
             [
                 self._translator.t("table_slab"),
                 self._translator.t("table_sticker"),
                 self._translator.t("table_slab_price"),
                 self._translator.t("table_sticker_price"),
+                self._translator.t("table_item_nameid"),
                 self._translator.t("table_difference"),
             ]
         )
@@ -1112,12 +1128,25 @@ class MainWindow(QtWidgets.QWidget):
         sticker_price.setData(None, QtCore.Qt.ItemDataRole.UserRole)
         sticker_price.setData(None, STICKER_PRICE_ROLE)
 
+        item_nameid_item = QtGui.QStandardItem(self._format_item_nameid_text(pair.index))
+        item_nameid_item.setEditable(False)
+        item_nameid_item.setData(
+            self._item_nameids.get(pair.index, {}), ITEM_NAMEID_ROLE
+        )
+
         difference = QtGui.QStandardItem("—")
         difference.setEditable(False)
         difference.setData(None, QtCore.Qt.ItemDataRole.UserRole)
         difference.setData(None, DIFFERENCE_ROLE)
 
-        return [slab_item, sticker_item, slab_price, sticker_price, difference]
+        return [
+            slab_item,
+            sticker_item,
+            slab_price,
+            sticker_price,
+            item_nameid_item,
+            difference,
+        ]
 
     def _build_search_entries(self) -> List[Dict[str, object]]:
         entries: List[Dict[str, object]] = []
@@ -1139,12 +1168,59 @@ class MainWindow(QtWidgets.QWidget):
         entries.sort(key=lambda item: item["label"])
         return entries
 
+    def _lookup_item_nameid(self, market_name: str) -> Optional[str]:
+        value = self._item_store.get(market_name)
+        if value:
+            return value
+        cached = self._cache.get_item_nameid(market_name)
+        if cached:
+            self._item_store.set(market_name, cached)
+            return cached
+        return None
+
+    def _format_item_nameid_text(self, pair_index: int) -> str:
+        item_ids = self._item_nameids.get(pair_index, {})
+        sticker_id = item_ids.get("sticker")
+        slab_id = item_ids.get("slab")
+        parts: List[str] = []
+        if sticker_id:
+            parts.append(f"Sticker: {sticker_id}")
+        if slab_id:
+            parts.append(f"Slab: {slab_id}")
+        if parts:
+            return "\n".join(parts)
+        return "—"
+
+    def _update_item_nameid_cell(
+        self, model: QtGui.QStandardItemModel, row: int, pair_index: int, text: str
+    ) -> None:
+        item = model.item(row, 4)
+        if item is None:
+            item = QtGui.QStandardItem("—")
+            model.setItem(row, 4, item)
+        item.setText(text)
+        item.setData(self._item_nameids.get(pair_index, {}), ITEM_NAMEID_ROLE)
+        item.setEditable(False)
+
+    def _apply_item_nameid_to_models(self, pair_index: int) -> None:
+        text = self._format_item_nameid_text(pair_index)
+        self._update_item_nameid_cell(self.table_model, pair_index, pair_index, text)
+        manual_row = self._manual_rows.get(pair_index)
+        if manual_row is not None:
+            self._update_item_nameid_cell(self.manual_model, manual_row, pair_index, text)
+        inventory_row = self._inventory_rows.get(pair_index)
+        if inventory_row is not None:
+            self._update_item_nameid_cell(
+                self.inventory_model, inventory_row, pair_index, text
+            )
+
     def _retranslate_ui(self) -> None:
         headers = [
             self._translator.t("table_slab"),
             self._translator.t("table_sticker"),
             self._translator.t("table_slab_price"),
             self._translator.t("table_sticker_price"),
+            self._translator.t("table_item_nameid"),
             self._translator.t("table_difference"),
         ]
         self.table_model.setHorizontalHeaderLabels(headers)
@@ -1644,10 +1720,10 @@ class MainWindow(QtWidgets.QWidget):
     def _update_difference_for_model(
         self, model: QtGui.QStandardItemModel, row: int, pair_index: int
     ) -> None:
-        item = model.item(row, 4)
+        item = model.item(row, 5)
         if item is None:
             item = QtGui.QStandardItem("—")
-            model.setItem(row, 4, item)
+            model.setItem(row, 5, item)
         prices = self._row_prices.setdefault(pair_index, {})
         slab_price = prices.get("slab")
         sticker_price = prices.get("sticker")
@@ -1704,6 +1780,7 @@ class MainWindow(QtWidgets.QWidget):
         self._worker_thread.started.connect(self._worker.run)
         self._worker.priceUpdated.connect(self._handle_price_update)
         self._worker.priceFailed.connect(self._handle_price_failure)
+        self._worker.itemIdResolved.connect(self._handle_item_nameid)
         self._worker.progressMessage.connect(self._update_status)
         self._worker.finished.connect(self._handle_finished)
         self._worker_thread.start()
@@ -1737,6 +1814,15 @@ class MainWindow(QtWidgets.QWidget):
         self._row_prices.setdefault(index, {})[key] = None
         self._apply_price_to_models(index, is_slab, message, None)
         self.proxy_model.invalidateFilter()
+
+    @QtCore.pyqtSlot(int, bool, str)
+    def _handle_item_nameid(self, index: int, is_slab: bool, item_nameid: str) -> None:
+        key = "slab" if is_slab else "sticker"
+        entry = self._item_nameids.setdefault(index, {})
+        if entry.get(key) == item_nameid:
+            return
+        entry[key] = item_nameid
+        self._apply_item_nameid_to_models(index)
 
     @QtCore.pyqtSlot(str)
     def _update_status(self, message: str) -> None:
