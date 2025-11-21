@@ -1007,8 +1007,13 @@ class MainWindow(QtWidgets.QWidget):
         self.table_view = QtWidgets.QTableView()
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSortingEnabled(True)
-        self.table_view.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.Stretch
+        table_header = self.table_view.horizontalHeader()
+        table_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        table_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        table_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.verticalHeader().setSectionResizeMode(
@@ -1038,8 +1043,13 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.manual_table_view = QtWidgets.QTableView()
         self.manual_table_view.setModel(self.manual_model)
-        self.manual_table_view.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.Stretch
+        manual_header = self.manual_table_view.horizontalHeader()
+        manual_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        manual_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        manual_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
         self.manual_table_view.verticalHeader().setVisible(False)
         self.manual_table_view.verticalHeader().setSectionResizeMode(
@@ -1067,8 +1077,13 @@ class MainWindow(QtWidgets.QWidget):
         )
         self.inventory_table_view = QtWidgets.QTableView()
         self.inventory_table_view.setModel(self.inventory_model)
-        self.inventory_table_view.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.Stretch
+        inventory_header = self.inventory_table_view.horizontalHeader()
+        inventory_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        inventory_header.setSectionResizeMode(
+            2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        inventory_header.setSectionResizeMode(
+            3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
         )
         self.inventory_table_view.verticalHeader().setVisible(False)
         self.inventory_table_view.verticalHeader().setSectionResizeMode(
