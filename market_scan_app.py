@@ -57,6 +57,13 @@ class Translator:
             "table_sticker_price": "Ціна стікеру (купівля/продаж)",
             "table_item_nameid": "item_nameid",
             "table_difference": "Різниця",
+            "fullscreen_open": "На весь екран",
+            "fullscreen_close": "Згорнути",
+            "export_button": "Експортувати",
+            "message_export_title": "Експорт таблиці",
+            "message_export_success": "Експортовано {count} рядків",
+            "message_export_empty": "Немає рядків для експорту",
+            "message_export_error": "Не вдалося зберегти таблицю: {error}",
             "manual_placeholder": "Введіть назву стікеру або слабу...",
             "manual_save": "Зберегти базу",
             "manual_import": "Імпортувати базу",
@@ -137,6 +144,13 @@ class Translator:
             "table_sticker_price": "Sticker price (buy/sell)",
             "table_item_nameid": "item_nameid",
             "table_difference": "Difference",
+            "fullscreen_open": "Full screen",
+            "fullscreen_close": "Restore",
+            "export_button": "Export",
+            "message_export_title": "Export table",
+            "message_export_success": "Exported {count} rows",
+            "message_export_empty": "No rows to export",
+            "message_export_error": "Failed to save the table: {error}",
             "manual_placeholder": "Enter sticker or slab name...",
             "manual_save": "Save base",
             "manual_import": "Import base",
@@ -979,6 +993,9 @@ class MainWindow(QtWidgets.QWidget):
         self._manual_row_pairs: Dict[int, int] = {}
         self._inventory_rows: Dict[int, int] = {}
         self._inventory_pairs: List[ItemPair] = []
+        self._fullscreen_dialog: Optional[QtWidgets.QDialog] = None
+        self._fullscreen_table_view: Optional[QtWidgets.QTableView] = None
+        self._fullscreen_close_button: Optional[QtWidgets.QPushButton] = None
         self.setWindowTitle("Steam Sticker Scanner")
         self.resize(1100, 700)
         self._init_ui()
@@ -1029,6 +1046,13 @@ class MainWindow(QtWidgets.QWidget):
 
         self.filters_panel = FiltersPanel(self._available_rarities, self._available_crates, self._translator)
         self.filters_panel.filtersChanged.connect(self._apply_filters)
+
+        self.fullscreen_button = QtWidgets.QPushButton()
+        self.fullscreen_button.setCheckable(True)
+        self.fullscreen_button.clicked.connect(self._toggle_fullscreen_table)
+
+        self.export_button = QtWidgets.QPushButton(self._translator.t("export_button"))
+        self.export_button.clicked.connect(self._export_visible_pairs)
 
         self.manual_model = QtGui.QStandardItemModel(0, 6)
         self.manual_model.setHorizontalHeaderLabels(
@@ -1154,6 +1178,11 @@ class MainWindow(QtWidgets.QWidget):
 
         all_pairs_tab = QtWidgets.QWidget()
         all_layout = QtWidgets.QVBoxLayout()
+        table_controls = QtWidgets.QHBoxLayout()
+        table_controls.addWidget(self.fullscreen_button)
+        table_controls.addWidget(self.export_button)
+        table_controls.addStretch()
+        all_layout.addLayout(table_controls)
         all_layout.addWidget(self.table_view)
         all_layout.addWidget(self.filters_panel)
         all_pairs_tab.setLayout(all_layout)
@@ -1194,6 +1223,7 @@ class MainWindow(QtWidgets.QWidget):
         self.setStyleSheet("background-color: #05090f; color: #c9d1d9; font-size: 14px;")
         self._apply_filters()
         self._update_manual_results("")
+        self._update_fullscreen_button_text()
 
     def _build_row_items(self, pair: ItemPair) -> List[QtGui.QStandardItem]:
         slab_item = QtGui.QStandardItem(pair.slab_name)
@@ -1343,6 +1373,9 @@ class MainWindow(QtWidgets.QWidget):
         self.tabs.setTabText(1, self._translator.t("tab_selected_pairs"))
         self.tabs.setTabText(2, self._translator.t("tab_inventory_pairs"))
         self.scan_button.setText(self._translator.t("scan_stop") if self._worker_thread else self._translator.t("scan_start"))
+        self.export_button.setText(self._translator.t("export_button"))
+        self._update_fullscreen_button_text()
+        self._update_fullscreen_dialog_text()
         self._translate_status_label()
         self._translate_inventory_status_label()
         self._search_entries = self._build_search_entries()
@@ -1858,6 +1891,130 @@ class MainWindow(QtWidgets.QWidget):
     def _save_settings(self) -> None:
         self._settings_data = self.settings_panel.export_dict()
         SETTINGS_FILE.write_text(json.dumps(self._settings_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _toggle_fullscreen_table(self) -> None:
+        if self._fullscreen_dialog:
+            self._fullscreen_dialog.close()
+            return
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowFlag(QtCore.Qt.WindowType.Window)
+        dialog.setModal(False)
+        dialog.setWindowTitle(self._translator.t("tab_all_pairs"))
+        layout = QtWidgets.QVBoxLayout(dialog)
+        table_view = QtWidgets.QTableView(dialog)
+        table_view.setModel(self.proxy_model)
+        table_view.setSortingEnabled(True)
+        header = table_view.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        table_view.verticalHeader().setVisible(False)
+        table_view.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        table_view.setAlternatingRowColors(True)
+        table_view.setTextElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        table_view.setWordWrap(True)
+        table_view.setStyleSheet(
+            "QTableView { background-color: #0d1117; color: #c9d1d9; gridline-color: #30363d; }"
+            "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
+        )
+
+        close_button = QtWidgets.QPushButton(self._translator.t("fullscreen_close"))
+        close_button.clicked.connect(dialog.close)
+        close_row = QtWidgets.QHBoxLayout()
+        close_row.addStretch()
+        close_row.addWidget(close_button)
+
+        layout.addWidget(table_view)
+        layout.addLayout(close_row)
+
+        dialog.finished.connect(self._handle_fullscreen_closed)
+        self._fullscreen_dialog = dialog
+        self._fullscreen_table_view = table_view
+        self._fullscreen_close_button = close_button
+        self._update_fullscreen_button_text()
+        self.fullscreen_button.setChecked(True)
+        dialog.showFullScreen()
+
+    def _handle_fullscreen_closed(self, _: int = 0) -> None:
+        self._fullscreen_dialog = None
+        self._fullscreen_table_view = None
+        self._fullscreen_close_button = None
+        self.fullscreen_button.setChecked(False)
+        self._update_fullscreen_button_text()
+
+    def _update_fullscreen_button_text(self) -> None:
+        if hasattr(self, "fullscreen_button"):
+            text = (
+                self._translator.t("fullscreen_close")
+                if self._fullscreen_dialog
+                else self._translator.t("fullscreen_open")
+            )
+            self.fullscreen_button.setText(text)
+
+    def _update_fullscreen_dialog_text(self) -> None:
+        if self._fullscreen_dialog:
+            self._fullscreen_dialog.setWindowTitle(self._translator.t("tab_all_pairs"))
+        if self._fullscreen_close_button:
+            self._fullscreen_close_button.setText(self._translator.t("fullscreen_close"))
+
+    def _export_visible_pairs(self) -> None:
+        row_count = self.proxy_model.rowCount()
+        if row_count == 0:
+            QtWidgets.QMessageBox.information(
+                self,
+                self._translator.t("message_result"),
+                self._translator.t("message_export_empty"),
+            )
+            return
+
+        default_path = BASE_DIR / "pairs_export.json"
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            self._translator.t("message_export_title"),
+            str(default_path),
+            "JSON (*.json)",
+        )
+        if not file_path:
+            return
+
+        exported: List[Dict[str, object]] = []
+        for row in range(row_count):
+            slab_name = self.proxy_model.index(row, 0).data()
+            sticker_name = self.proxy_model.index(row, 1).data()
+            slab_buy = self.proxy_model.index(row, 2).data(SLAB_PRICE_ROLE)
+            slab_sell = self.proxy_model.index(row, 2).data(SELL_PRICE_ROLE)
+            sticker_buy = self.proxy_model.index(row, 3).data(STICKER_PRICE_ROLE)
+            sticker_sell = self.proxy_model.index(row, 3).data(SELL_PRICE_ROLE)
+            item_nameids = self.proxy_model.index(row, 4).data(ITEM_NAMEID_ROLE) or {}
+            difference = self.proxy_model.index(row, 5).data(DIFFERENCE_ROLE)
+            exported.append(
+                {
+                    "slab": slab_name,
+                    "sticker": sticker_name,
+                    "slab_price": {"buy": slab_buy, "sell": slab_sell},
+                    "sticker_price": {"buy": sticker_buy, "sell": sticker_sell},
+                    "item_nameids": item_nameids,
+                    "difference": difference,
+                }
+            )
+
+        try:
+            Path(file_path).write_text(
+                json.dumps(exported, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except OSError as exc:
+            QtWidgets.QMessageBox.critical(
+                self,
+                self._translator.t("message_error"),
+                self._translator.t("message_export_error", error=str(exc)),
+            )
+            return
+
+        QtWidgets.QMessageBox.information(
+            self,
+            self._translator.t("message_done"),
+            self._translator.t("message_export_success", count=len(exported)),
+        )
 
     def _apply_filters(self) -> None:
         if not hasattr(self, "proxy_model"):
