@@ -1901,6 +1901,15 @@ class MainWindow(QtWidgets.QWidget):
         dialog.setModal(False)
         dialog.setWindowTitle(self._translator.t("tab_all_pairs"))
         layout = QtWidgets.QVBoxLayout(dialog)
+
+        close_button = QtWidgets.QPushButton(self._translator.t("fullscreen_close"))
+        close_button.clicked.connect(dialog.close)
+        close_panel = QtWidgets.QWidget(dialog)
+        close_panel_layout = QtWidgets.QHBoxLayout(close_panel)
+        close_panel_layout.setContentsMargins(8, 8, 8, 8)
+        close_panel_layout.addStretch()
+        close_panel_layout.addWidget(close_button)
+
         table_view = QtWidgets.QTableView(dialog)
         table_view.setModel(self.proxy_model)
         table_view.setSortingEnabled(True)
@@ -1918,14 +1927,8 @@ class MainWindow(QtWidgets.QWidget):
             "QHeaderView::section { background-color: #161b22; color: #58a6ff; border: none; padding: 6px; }"
         )
 
-        close_button = QtWidgets.QPushButton(self._translator.t("fullscreen_close"))
-        close_button.clicked.connect(dialog.close)
-        close_row = QtWidgets.QHBoxLayout()
-        close_row.addStretch()
-        close_row.addWidget(close_button)
-
+        layout.addWidget(close_panel)
         layout.addWidget(table_view)
-        layout.addLayout(close_row)
 
         dialog.finished.connect(self._handle_fullscreen_closed)
         self._fullscreen_dialog = dialog
