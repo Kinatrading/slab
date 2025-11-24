@@ -1612,7 +1612,14 @@ class MainWindow(QtWidgets.QWidget):
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/121.0 Safari/537.36"
                 ),
+                "Accept": "application/json, text/plain, */*",
                 "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://steamcommunity.com/",
+                "X-Requested-With": "XMLHttpRequest",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Host": "steamcommunity.com",
             }
         )
         if settings.cookies:
