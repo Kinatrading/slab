@@ -40,6 +40,7 @@ class Translator:
             "filters_all_crates": "Усі крейти",
             "filters_min_price": "Мін ціна",
             "filters_max_price": "Макс ціна",
+            "filters_search_crates": "Пошук крейтів...",
             "filters_unknown": "Невідомо",
             "filters_selected": "Обрано: {count}",
             "settings_title": "Налаштування",
@@ -127,6 +128,7 @@ class Translator:
             "filters_all_crates": "All crates",
             "filters_min_price": "Min price",
             "filters_max_price": "Max price",
+            "filters_search_crates": "Search crates...",
             "filters_unknown": "Unknown",
             "filters_selected": "Selected: {count}",
             "settings_title": "Settings",
@@ -740,7 +742,7 @@ class FiltersPanel(QtWidgets.QGroupBox):
             rarities or [self._translator.t("filters_unknown")],
             self._handle_rarity_menu,
         )
-        self.crates_button, self._crate_actions = self._build_menu_button(
+        self.crates_button, self._crate_list, self._crate_filter_input = self._build_crates_menu(
             self._translator.t("filters_all_crates"), crates, self._handle_crate_menu
         )
 
@@ -786,6 +788,61 @@ class FiltersPanel(QtWidgets.QGroupBox):
         button.setEnabled(bool(actions))
         return button, actions
 
+    def _build_crates_menu(
+        self,
+        placeholder: str,
+        options: List[str],
+        handler: Callable[[], None],
+    ) -> Tuple[QtWidgets.QToolButton, QtWidgets.QListWidget, QtWidgets.QLineEdit]:
+        menu = QtWidgets.QMenu(self)
+
+        filter_input = QtWidgets.QLineEdit()
+        filter_input.setPlaceholderText(self._translator.t("filters_search_crates"))
+
+        list_widget = QtWidgets.QListWidget()
+        list_widget.setVerticalScrollMode(QtCore.Qt.ScrollMode.ScrollPerPixel)
+        list_widget.setMaximumHeight(240)
+        list_widget.setMinimumWidth(220)
+
+        for option in options:
+            text = option or self._translator.t("filters_unknown")
+            item = QtWidgets.QListWidgetItem(text)
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, option)
+            item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(QtCore.Qt.CheckState.Unchecked)
+            list_widget.addItem(item)
+
+        def _filter_items(text: str) -> None:
+            query = text.lower()
+            for index in range(list_widget.count()):
+                item = list_widget.item(index)
+                item.setHidden(bool(query) and not item.text().lower().startswith(query))
+
+        filter_input.textChanged.connect(_filter_items)
+        list_widget.itemChanged.connect(handler)
+        list_widget.itemChanged.connect(self.filtersChanged.emit)
+
+        container_widget = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(container_widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
+        layout.addWidget(filter_input)
+        layout.addWidget(list_widget)
+
+        action = QtWidgets.QWidgetAction(menu)
+        action.setDefaultWidget(container_widget)
+        menu.addAction(action)
+
+        button = QtWidgets.QToolButton()
+        button.setText(placeholder)
+        button.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+        button.setMenu(menu)
+        button.setStyleSheet(
+            "QToolButton { background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; padding: 6px; }"
+        )
+        button.setEnabled(bool(options))
+        return button, list_widget, filter_input
+
     def _handle_min_price_change(self, value: float) -> None:
         self.max_price_input.setMinimum(value)
         self.filtersChanged.emit()
@@ -804,9 +861,8 @@ class FiltersPanel(QtWidgets.QGroupBox):
             self.crates_button, self._translator.t("filters_all_crates"), self.selected_crates()
         )
 
-    @staticmethod
     def _update_button_label(
-        button: QtWidgets.QToolButton, default_text: str, selected: Set[str]
+        self, button: QtWidgets.QToolButton, default_text: str, selected: Set[str]
     ) -> None:
         if not selected:
             button.setText(default_text)
@@ -819,7 +875,14 @@ class FiltersPanel(QtWidgets.QGroupBox):
         return {action.data() for action in self._rarity_actions if action.isChecked()}
 
     def selected_crates(self) -> Set[str]:
-        return {action.data() for action in self._crate_actions if action.isChecked()}
+        crates: Set[str] = set()
+        for index in range(self._crate_list.count()):
+            item = self._crate_list.item(index)
+            if item.checkState() == QtCore.Qt.CheckState.Checked:
+                data = item.data(QtCore.Qt.ItemDataRole.UserRole)
+                if data is not None:
+                    crates.add(data)
+        return crates
 
     def export_filters(self) -> Dict[str, object]:
         return {
@@ -835,10 +898,20 @@ class FiltersPanel(QtWidgets.QGroupBox):
         self.priced_only.setText(self._translator.t("filters_priced_only"))
         self.rarity_button.setText(self._translator.t("filters_all_rarities"))
         self.crates_button.setText(self._translator.t("filters_all_crates"))
+        self._crate_filter_input.setPlaceholderText(self._translator.t("filters_search_crates"))
         self._relabel_actions(self._rarity_actions, self._available_rarities, is_rarity=True)
-        self._relabel_actions(self._crate_actions, self._available_crates, is_rarity=False)
         self._update_button_label(self.rarity_button, self._translator.t("filters_all_rarities"), self.selected_rarities())
         self._update_button_label(self.crates_button, self._translator.t("filters_all_crates"), self.selected_crates())
+        self._relabel_crates()
+
+    def _relabel_crates(self) -> None:
+        unknown_label = self._translator.t("filters_unknown")
+        for index, option in enumerate(self._available_crates):
+            if index >= self._crate_list.count():
+                break
+            item = self._crate_list.item(index)
+            item.setText(option or unknown_label)
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, option)
 
     def _relabel_actions(
         self, actions: List[QtGui.QAction], options: List[str], *, is_rarity: bool
