@@ -800,7 +800,10 @@ class FiltersPanel(QtWidgets.QGroupBox):
         filter_input.setPlaceholderText(self._translator.t("filters_search_crates"))
 
         list_widget = QtWidgets.QListWidget()
-        list_widget.setVerticalScrollMode(QtCore.Qt.ScrollMode.ScrollPerPixel)
+        list_widget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        list_widget.verticalScrollBar().setSingleStep(
+            max(8, list_widget.fontMetrics().height())
+        )
         list_widget.setMaximumHeight(240)
         list_widget.setMinimumWidth(220)
 
